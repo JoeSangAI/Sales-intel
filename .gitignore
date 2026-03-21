@@ -1,0 +1,16 @@
+# 敏感信息，绝对不上传
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 数据文件（去重缓存不上传）
+data/seen_urls.json
+
+# macOS
+.DS_Store
