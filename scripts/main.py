@@ -34,7 +34,7 @@ _load_dotenv()
 
 from scripts.search import (
     run_search, get_api_key,
-    run_fundraising_search, run_track_research,
+    run_fundraising_search,
     record_source_hits, is_weekly_industry_day,
     is_fundraising_day, set_last_fundraising_date, get_last_fundraising_date,
 )
@@ -43,12 +43,9 @@ from scripts.analyzer import (
     build_analysis_prompt, build_industry_prompt,
     parse_analysis_response, filter_by_score,
     build_fundraising_prompt, parse_fundraising_response,
-    group_results_by_track, identify_high_value_tracks,
-    generate_industry_insight, enrich_with_focus_media_cases,
 )
 from scripts.report import generate_report, generate_full_report
 from scripts.memory import (
-    get_personalized_weights, get_exploration_candidates,
     record_interaction, record_feedback, content_hash_from_result,
     set_profile as set_memory_profile, get_profile as get_memory_profile,
 )
@@ -252,20 +249,6 @@ def _call_openclaw_model(prompt: str, retries: int = 2) -> dict:
     """调用 DeerAPI 分析，失败 fallback MiniMax"""
     return _call_llm_api(prompt, parse_analysis_response, retries)
 
-
-def _quick_search(query: str) -> list[dict]:
-    """快速搜索（用于行业洞察生成时的案例补充）"""
-    try:
-        from scripts.search import search_tavily
-        # 不传 api_key，让 search_tavily 自动使用 Bocha 优先策略
-        results = search_tavily(
-            query=query,
-            time_range="week",
-            max_results=3,
-        )
-        return [{"title": r.get("title", ""), "content": r.get("content", ""), "url": r.get("url", "")} for r in results]
-    except Exception:
-        return []
 
 
 def analyze_fundraising(results: list[dict]) -> list[dict]:
@@ -511,15 +494,10 @@ def _run_pipeline_inner(
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
-    # Step 0: 个性化权重
-    weights = get_personalized_weights()
-    exploration_ratio = weights.get("exploration_ratio", 0.1)
-
     print(f"[{date_str}] 开始销售情报生成...")
     print(f"  品牌监控: {len(brand_configs)} 个")
     print(f"  行业搜索: {'是' if include_industry else '否'}")
     print(f"  融资专项: 是（{len(fundraising_config.get('tracks', []))} 个赛道）")
-    print(f"  探索比例: {int(exploration_ratio * 100)}%")
 
     if dry_run:
         print("  [DRY RUN] 跳过实际搜索")
@@ -612,7 +590,7 @@ def _run_pipeline_inner(
             set_last_fundraising_date(datetime.now().date().isoformat())
         else:
             fundraising_results_raw = []
-            fr_label = "否（距上次 < 3 天）"
+            fr_label = "否（非周一/周四）"
             fr_count = 0
 
         print(f"\n[Step 2] 融资专项搜索: {fr_label}")
@@ -666,65 +644,8 @@ def _run_pipeline_inner(
     except Exception as e:
         print(f"  [信息来源追踪失败] {e}")
 
-    # ── Step 5: 行业洞察生成 ────────────────────────────────
-    # 当某赛道有高价值融资信号（>=1条7分以上）时，生成深度洞察
-    print("\n[Step 5] 行业洞察生成...")
-    high_value_tracks = identify_high_value_tracks(analyzed_fr, min_score=7)
-    industry_insights = []
-
-    if high_value_tracks:
-        print(f"  检测到 {len(high_value_tracks)} 个高价值赛道: {', '.join(high_value_tracks)}")
-
-        # 对高价值赛道进行深度研究搜索
-        track_results = run_track_research(
-            tracks=fundraising_config.get("tracks", []),
-            include_tracks=high_value_tracks,
-        )
-
-        # 为每个高价值赛道生成洞察
-        for track_name in high_value_tracks:
-            # 找到该赛道的高相关度信号
-            track_signals = [
-                r for r in analyzed_fr
-                if r.get("track_name") == track_name
-                and r.get("analysis", {}).get("relevance_score", 0) >= 7
-            ]
-            # 找到对应的行业配置（赛道名和行业名可能略有差异，做模糊匹配）
-            # 手动映射 + 通配 fallback
-            _track_to_industry = {
-                "AI大模型": "AI科技",
-                "机器人/具身智能": "机器人与具身智能",
-                "智能硬件/IoT": "智能硬件与IoT",
-                "企业服务/SaaS": "企业服务与SaaS",
-                "半导体": "半导体与集成电路",
-            }
-            target_ind = _track_to_industry.get(track_name, track_name)
-            ind_cfg = next(
-                (c for c in industry_configs if c.get("name") == target_ind), None
-            )
-            # 优先用配置的视角，没有就用赛道名本身作为视角
-            analysis_perspective = ind_cfg.get("analysis_perspective", "") if ind_cfg else track_name
-
-            insight = generate_industry_insight(
-                industry_name=track_name,
-                recent_signals=track_signals,
-                analysis_perspective=analysis_perspective,
-                call_search_fn=lambda kw: _quick_search(kw),
-                raw_llm_call_fn=_call_llm_raw,
-            )
-            industry_insights.append(insight)
-
-    # ── Step 6: 探索板块 ───────────────────────────────────
-    # 从被过滤掉的低分结果中，抽取10%作为探索内容
-    exploration_items = []
-    if exploration_ratio > 0:
-        low_score_items = [r for r in analyzed if r.get("analysis", {}).get("relevance_score", 0) < min_score]
-        n_explore = max(1, int(len(low_score_items) * exploration_ratio)) if low_score_items else 0
-        import random
-        exploration_items = random.sample(low_score_items, min(n_explore, len(low_score_items)))
-
-    # ── Step 7: 生成日报 ───────────────────────────────────
-    print("\n[Step 7] 生成日报...")
+    # ── Step 5: 生成日报 ───────────────────────────────────
+    print("\n[Step 5] 生成日报...")
     report = generate_full_report(
         analyzed_results=filtered,
         fundraising_results=[r for r in analyzed if r.get("brand", "").startswith("[融资]")],
@@ -733,7 +654,7 @@ def _run_pipeline_inner(
     )
     print(f"  日报生成完成，共 {len(report)} 字符")
 
-    # ── Step 8: 记录本次推送 ───────────────────────────────
+    # ── Step 6: 记录本次推送 ───────────────────────────────
     from scripts.dedup import record_pushed_events, _normalize_title
     pushed_events = []
     for r in filtered:
@@ -851,7 +772,7 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
 
     # Phase 1b: 融资专项预取（只查一次，全局共享）
     if is_fundraising_day():
-        print(f"\n[多档案模式] 融资专项搜索（每3天一次）...")
+        print(f"\n[多档案模式] 融资专项搜索（每周一、四）...")
         fr_config = shared_config.get("fundraising", {})
         pre_fr_results = run_fundraising_search(fr_config)
         print(f"  融资搜索结果: {len(pre_fr_results)} 条")

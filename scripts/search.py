@@ -92,14 +92,9 @@ def set_last_fundraising_date(date_str: str) -> None:
 
 
 def is_fundraising_day() -> bool:
-    """判断今天是否应该运行融资专项搜索（距上次运行 >= 3 天）"""
-    last = get_last_fundraising_date()
-    today = datetime.now().date().isoformat()
-    if not last:
-        return True  # 从未运行过，今天运行
-    last_date = datetime.strptime(last, "%Y-%m-%d").date()
-    diff = (datetime.now().date() - last_date).days
-    return diff >= 3
+    """判断今天是否应该运行融资专项搜索（仅周一和周四）"""
+    today = datetime.now().weekday()
+    return today in (0, 3)  # 0=周一, 3=周四
 
 
 def get_api_key() -> str:
