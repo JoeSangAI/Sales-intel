@@ -504,13 +504,13 @@ def _run_pipeline_inner(
         return ""
 
     # ── Step 1: 搜索（或从存档加载 + 增量搜索）─────────────
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    if date_str is None:
+        date_str = datetime.now().strftime("%Y-%m-%d")
 
     if use_cache:
-        # 增量模式：从存档加载，对比配置变化，只搜新增部分
+        # 纯缓存模式：从存档加载所有数据，不再进行增量搜索
         from scripts.search_archive import (
-            load_results, has_archive, load_profile_config,
-            get_archived_brand_names, save_results as archive_save,
+            load_results, has_archive, save_results as archive_save,
         )
         pf = profile_name or "default"
 
@@ -518,47 +518,8 @@ def _run_pipeline_inner(
             print(f"\n[Step 1] 存档为空，请先正常搜索")
             return ""
 
-        old_config = load_profile_config(date_str, pf)
-        old_brand_names = {b["name"] for b in old_config.get("brands", [])} if old_config else set()
-        old_industry_names = {i["name"] for i in old_config.get("industries", [])} if old_config else set()
-
-        curr_brand_names = {b["name"] for b in brand_configs}
-        curr_industry_names = {i["name"] for i in industry_configs}
-
-        new_brand_names = curr_brand_names - old_brand_names
-        new_industry_names = curr_industry_names - old_industry_names
-
-        if not new_brand_names and not new_industry_names:
-            # 没有任何新增，完全从存档加载
-            all_raw = load_results(date_str, pf)
-            print(f"\n[Step 1] 从存档加载: {len(all_raw)} 条（配置无变化）")
-        else:
-            # 部分新增：复用存档 + 增量搜索
-            archived = load_results(date_str, pf)
-            # 保留未变化品牌的存档结果
-            kept = [r for r in archived if r.get("query_type", "").startswith("brand")
-                    and r.get("brand", "") in old_brand_names]
-            print(f"\n[Step 1] 存档保留（{len(kept)} 条）+ 增量搜索（新增品牌: {new_brand_names} / 行业: {new_industry_names}）")
-
-            new_brand_cfgs = [b for b in brand_configs if b["name"] in new_brand_names]
-            new_ind_cfgs = [i for i in industry_configs if i["name"] in new_industry_names]
-
-            new_results = []
-            if new_brand_cfgs:
-                new_search_results = run_search(brand_configs=new_brand_cfgs, industry_configs=[], include_industry=False)
-                new_results.extend(new_search_results)
-                print(f"  新品牌搜索: {len(new_search_results)} 条")
-            if new_ind_cfgs:
-                new_ind_results = run_search(brand_configs=[], industry_configs=new_ind_cfgs, include_industry=True)
-                new_results.extend(new_ind_results)
-                print(f"  新行业搜索: {len(new_ind_results)} 条")
-
-            all_raw = kept + new_results
-
-        # 合并后存档（更新后的完整结果）
-        if all_raw:
-            archive_save(all_raw, date_str, pf, profile_config={
-                "brands": brand_configs, "industries": industry_configs})
+        all_raw = load_results(date_str, pf)
+        print(f"\n[Step 1] 从存档加载（纯缓存模式）: {len(all_raw)} 条")
     elif search_pool is not None:
         # 来自共享池：直接分发，跳过独立搜索
         print("\n[Step 1] 从搜索共享池分发结果...")
@@ -602,12 +563,17 @@ def _run_pipeline_inner(
         print("\n  无搜索结果，跳过日报")
         return ""
 
-    # 存档数据已经是去重后的，不需要再走 dedup
+    # 分离品牌/行业结果 和 融资结果
+    brand_industry_results = [r for r in all_raw if not r.get("brand", "").startswith("[融资]")]
+    fundraising_results = [r for r in all_raw if r.get("brand", "").startswith("[融资]")]
+
     if use_cache:
         new_results = all_raw
-        print(f"\n[Step 2] 从存档加载（跳过重复检查）: {len(new_results)} 条")
+        print(f"\n[Step 2] 从存档加载（跳过重复检查）: {len(brand_industry_results)} 条客户新闻 + {len(fundraising_results)} 条融资新闻")
     else:
-        new_results = deduplicate(all_raw)
+        # 品牌/行业去重（融资结果不需要去重，因为每次都是全量搜索）
+        brand_industry_deduped = deduplicate(brand_industry_results)
+        new_results = brand_industry_deduped + fundraising_results
         print(f"\n[Step 2] 去重后: {len(new_results)} 条新结果")
         # 存档搜索结果（支持后续重新生成报告）
         if new_results:
@@ -620,7 +586,7 @@ def _run_pipeline_inner(
         print("  无新结果，跳过日报")
         return ""
 
-    # 分离品牌/行业结果 和 融资结果
+    # 重新从 new_results 分离（去重后结果可能变化）
     brand_industry_results = [r for r in new_results if not r.get("brand", "").startswith("[融资]")]
     fundraising_results = [r for r in new_results if r.get("brand", "").startswith("[融资]")]
 
