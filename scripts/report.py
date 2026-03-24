@@ -520,7 +520,17 @@ def _format_fundraising_cluster(cluster: list[dict], date_str: str = "") -> list
     lines = []
     count_str = f"，{len(cluster)} 篇报道" if len(cluster) > 1 else ""
     date_suffix = f" · {date_str}" if date_str else ""
-    lines.append(f"- **{title}**（{score}/10{count_str}{date_suffix}）")
+    # 品牌名独占一行加粗，与新闻标题分层
+    brand_label = ""
+    for it in cluster:
+        company = _get_fundraising_company(it)
+        if company:
+            brand_label = company
+            break
+    if brand_label:
+        lines.append(f"**{brand_label}**")
+        lines.append("")
+    lines.append(f"- {title}（{score}/10{count_str}{date_suffix}）")
     lines.append("")
     if intel_summary:
         lines.append(f"  {intel_summary}")
@@ -564,6 +574,40 @@ def _group_fundraising_by_track(results: list[dict]) -> dict:
     return tracks
 
 
+def _get_fundraising_company(item: dict) -> str:
+    """从融资条目中提取实际公司名（用于聚类合并）"""
+    leads = item.get("analysis", {}).get("prospect_leads", [])
+    if leads and leads[0].get("name"):
+        return leads[0]["name"].strip()
+    return ""
+
+
+def _cluster_fundraising_items(items: list[dict]) -> list[list[dict]]:
+    """融资条目聚类：先按公司名合并，再对剩余条目做标题聚类。
+
+    解决同一公司出现在不同标题文章中未被合并的问题。
+    """
+    # 第一轮：按公司名分组
+    by_company = {}
+    no_company = []
+    for item in items:
+        company = _get_fundraising_company(item)
+        if company:
+            if company not in by_company:
+                by_company[company] = []
+            by_company[company].append(item)
+        else:
+            no_company.append(item)
+
+    clusters = list(by_company.values())
+
+    # 第二轮：无公司名的条目用标题聚类
+    if no_company:
+        clusters.extend(_cluster_items(no_company))
+
+    return clusters
+
+
 
 
 
@@ -574,78 +618,145 @@ def generate_fundraising_section(fundraising_results: list[dict], date_str: str)
 
     by_track = _group_fundraising_by_track(fundraising_results)
 
+    # ── 第一步：按公司名去重，避免同一公司出现在多个赛道 ──
+    # 每个公司只保留一条（取紧迫度最高的）
+    # 公司名归一化：去掉"机器人"等后缀，避免同一公司不同命名被当作不同公司
+    def _normalize_company(name: str) -> str:
+        """归一化公司名，用于去重比较"""
+        if not name:
+            return ""
+        import re
+        # 去掉常见后缀
+        for suffix in ["机器人", "科技", "智能", "网络", "数字", "系统"]:
+            if name.endswith(suffix) and len(name) > len(suffix) + 2:
+                name = name[:-len(suffix)]
+        return name.strip()
+
+    seen_companies = {}  # normalized_name -> (original_name, best_item)
+    for item in fundraising_results:
+        company = _get_fundraising_company(item)
+        if not company:
+            company = item.get("brand", "").replace("[融资]", "")
+        normalized = _normalize_company(company)
+        if not normalized:
+            continue
+        if normalized not in seen_companies:
+            seen_companies[normalized] = (company, item)
+        else:
+            # 取紧迫度更高的
+            existing_item = seen_companies[normalized][1]
+            existing_u = existing_item.get("analysis", {}).get("urgency", "⚪")
+            new_u = item.get("analysis", {}).get("urgency", "⚪")
+            u_priority = {"🔴": 3, "🟡": 2, "⚪": 1}
+            if u_priority.get(new_u, 0) > u_priority.get(existing_u, 0):
+                seen_companies[normalized] = (company, item)
+
+    deduped_results = [item for _, item in seen_companies.values()]
+
     # 汇总总览表
     red_count = sum(
-        1 for r in fundraising_results
+        1 for r in deduped_results
         if r.get("analysis", {}).get("urgency") == "🔴"
     )
     yellow_count = sum(
-        1 for r in fundraising_results
+        1 for r in deduped_results
         if r.get("analysis", {}).get("urgency") == "🟡"
     )
 
     lines = ["## 💰 融资新闻", ""]
-    lines.append(f"> **本周期关注赛道融资动态一览** · 共 {len(fundraising_results)} 品牌获融资，其中 🔴 本周跟进 {red_count} 家，🟡 本月关注 {yellow_count} 家")
+    lines.append(f"> **本周期关注赛道融资动态一览** · 共 {len(deduped_results)} 品牌获融资，其中 🔴 本周跟进 {red_count} 家，🟡 本月关注 {yellow_count} 家")
     lines.append("")
     lines.append("| 赛道 | 品牌 | 融资概况 | 紧迫度 |")
     lines.append("|------|------|----------|--------|")
 
-    urgency_map = {}
-    for r in fundraising_results:
-        u = r.get("analysis", {}).get("urgency", "⚪")
-        if u in ("🔴", "🟡"):
-            urgency_map[r.get("brand", "")] = u
+    # 汇总表按公司去重后展示
+    seen_brands_in_table = set()
+    for item in deduped_results:
+        u = item.get("analysis", {}).get("urgency", "⚪")
+        if u not in ("🔴", "🟡"):
+            continue
+        prospect_leads = item.get("analysis", {}).get("prospect_leads", [])
+        if prospect_leads and prospect_leads[0].get("name"):
+            brand = prospect_leads[0]["name"]
+        else:
+            brand = item.get("brand", "").replace("[融资]", "")
+        normalized_brand = _normalize_company(brand)
+        if normalized_brand in seen_brands_in_table:
+            continue
+        seen_brands_in_table.add(normalized_brand)
+        track_name = item.get("track_name", "其他")
+        summary = item.get("analysis", {}).get("intel_summary", "")
+        amount = ""
+        import re
+        m = re.search(r"([0-9]+[亿万元])(?:.*?融资|币)", summary)
+        if not m:
+            m = re.search(r"([0-9]+[亿万元])", summary)
+        amount = m.group(1) if m else "—"
+        round_match = re.search(r"(A|B|C|D|S)[轮+]", summary)
+        round_str = f"{round_match.group(1)}轮 · " if round_match else ""
+        lines.append(f"| {track_name} | {brand} | {round_str}{amount} | {u} |")
 
+    # ── 第二步：赛道详情（每个公司只出现一次） ──
+    # 按公司名聚类，取代按赛道聚类
+    all_clusters = _cluster_fundraising_items(deduped_results)
+
+    # 按紧迫度分组
+    urgency_groups = {"🔴": [], "🟡": [], "⚪": []}
+    for cluster in all_clusters:
+        u = _cluster_urgency(cluster)
+        urgency_groups[u].append(cluster)
+
+    if not urgency_groups["🔴"] and not urgency_groups["🟡"]:
+        return "\n".join(lines)
+
+    # 按赛道组织详情：先聚类再按赛道分组展示
+    # 每个公司只归属一个赛道（取第一个出现的赛道）
+    track_for_company = {}  # company -> track_name
+    company_track_assigned = set()
     for track_name, items in by_track.items():
         for item in items:
-            u = item.get("analysis", {}).get("urgency", "⚪")
-            if u not in ("🔴", "🟡"):
-                continue
-            # 优先从 prospect_leads 取实际品牌名，其次用原始brand字段
-            prospect_leads = item.get("analysis", {}).get("prospect_leads", [])
-            if prospect_leads and prospect_leads[0].get("name"):
-                brand = prospect_leads[0]["name"]
-            else:
-                brand = item.get("brand", "").replace("[融资]", "")
-            # 从 intel_summary 提取融资关键信息
-            summary = item.get("analysis", {}).get("intel_summary", "")
-            # 尝试提取金额
-            amount = ""
-            import re
-            m = re.search(r"([0-9]+[亿万元])(?:.*?融资|币)", summary)
-            if not m:
-                m = re.search(r"([0-9]+[亿万元])", summary)
-            amount = m.group(1) if m else "—"
-            round_match = re.search(r"(A|B|C|D|S)[轮+]", summary)
-            round_str = f"{round_match.group(1)}轮 · " if round_match else ""
-            lines.append(f"| {track_name} | {brand} | {round_str}{amount} | {u} |")
+            company = _get_fundraising_company(item)
+            if not company:
+                company = item.get("brand", "").replace("[融资]", "")
+            if company not in company_track_assigned:
+                track_for_company[company] = track_name
+                company_track_assigned.add(company)
 
+    # 按赛道分组输出
     for track_name, items in by_track.items():
-        clusters = _cluster_items(items)
+        track_clusters = []
+        for cluster in all_clusters:
+            # 取簇中任意一条的公司名
+            sample_item = cluster[0]
+            company = _get_fundraising_company(sample_item)
+            if not company:
+                company = sample_item.get("brand", "").replace("[融资]", "")
+            if track_for_company.get(company) == track_name:
+                track_clusters.append(cluster)
 
-        urgency_groups = {"🔴": [], "🟡": [], "⚪": []}
-        for cluster in clusters:
+        track_urgency_groups = {"🔴": [], "🟡": [], "⚪": []}
+        for cluster in track_clusters:
             u = _cluster_urgency(cluster)
-            urgency_groups[u].append(cluster)
+            track_urgency_groups[u].append(cluster)
 
-        if not urgency_groups["🔴"] and not urgency_groups["🟡"]:
+        if not track_urgency_groups["🔴"] and not track_urgency_groups["🟡"]:
             continue
 
         lines.append("")
         lines.append(f"### {track_name}")
         lines.append("")
 
-        if urgency_groups["🔴"]:
+        if track_urgency_groups["🔴"]:
             lines.append("#### 🔴 本周跟进")
             lines.append("")
-            for cluster in urgency_groups["🔴"]:
+            for cluster in track_urgency_groups["🔴"]:
                 lines.extend(_format_fundraising_cluster(cluster, date_str))
                 lines.append("")
 
-        if urgency_groups["🟡"]:
+        if track_urgency_groups["🟡"]:
             lines.append("#### 🟡 本月关注")
             lines.append("")
-            for cluster in urgency_groups["🟡"]:
+            for cluster in track_urgency_groups["🟡"]:
                 lines.extend(_format_fundraising_cluster(cluster, date_str))
                 lines.append("")
 
@@ -660,6 +771,8 @@ def generate_full_report(
     fundraising_results: list[dict] = None,
     date_str: str = None,
     profile_name: str = None,
+    brand_configs: list[dict] = None,
+    is_first_run: bool = False,
 ) -> str:
     """
     生成完整日报（整合所有板块）
@@ -667,6 +780,9 @@ def generate_full_report(
     板块顺序：
     1. 客户动态（品牌监控）
     2. 融资速报
+
+    brand_configs: 品牌配置列表，用于在无新闻时显示提示
+    is_first_run: 是否为首次运行（影响无新闻时的提示文案）
     """
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -679,11 +795,10 @@ def generate_full_report(
         title += f" · {profile_name}"
     lines = [title, ""]
 
-    # ── 1. 客户动态 ──
+    # ── 1. 客户动态（仅品牌监控，不含行业） ──
     brand_items = [r for r in analyzed_results if not r.get("brand", "").startswith("[")]
-    industry_items = [r for r in analyzed_results if r.get("brand", "").startswith("[行业]")]
 
-    if brand_items or industry_items:
+    if brand_items:
         lines.append("## 📋 客户新闻")
         lines.append("")
 
@@ -723,20 +838,19 @@ def generate_full_report(
                 lines.extend(_format_cluster(cluster, date_str))
                 lines.append("")
 
-    # 行业客户
-    industry_by_name = {}
-    for r in industry_items:
-        brand = r.get("brand", "").replace("[行业]", "")
-        if brand not in industry_by_name:
-            industry_by_name[brand] = []
-        industry_by_name[brand].append(r)
-
-    for industry_name, items in industry_by_name.items():
-        lines.append(f"### {industry_name}")
-        lines.append("")
-        clusters = _cluster_items(items)
-        for cluster in clusters:
-            lines.extend(_format_industry_cluster(cluster))
+    # ── 无新闻品牌提示 ──
+    if brand_configs:
+        brands_with_news = set(brand_by_name.keys())
+        brands_monitored = {cfg["name"] for cfg in brand_configs}
+        brands_no_news = brands_monitored - brands_with_news
+        if brands_no_news:
+            lines.append("")
+            lines.append("### 暂无动态")
+            lines.append("")
+            time_window = "过去一年" if is_first_run else "今日"
+            for brand in sorted(brands_no_news):
+                lines.append(f"- **{brand}**：{time_window}内暂无和营销广告方向相关的咨询值得关注")
+            lines.append("")
 
     # ── 2. 融资速报 ──
     if fundraising_results:

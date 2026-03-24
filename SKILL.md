@@ -14,8 +14,8 @@ schedule:
   cron: "0 8 * * *"
   heartbeat: HEARTBEAT.md
 env:
-  - TAVILY_API_KEY
-  - DEER_API_KEY
+  - BOCHA_API_KEY
+  - MINIMAX_API_KEY
 ---
 
 # 销售情报助手 v0.2

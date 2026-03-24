@@ -37,6 +37,7 @@ from scripts.search import (
     run_fundraising_search,
     record_source_hits, is_weekly_industry_day,
     is_fundraising_day, set_last_fundraising_date, get_last_fundraising_date,
+    is_first_run,
 )
 from scripts.dedup import deduplicate, set_profile as set_dedup_profile, get_profile as get_dedup_profile
 from scripts.analyzer import (
@@ -115,11 +116,22 @@ def _merge_config_with_profile(shared_config: dict, profile: dict) -> dict:
 
 
 def _analyze_single(r: dict, parser_fn) -> dict:
-    """对单条结果执行 AI 分析，返回带 analysis 字段的结果"""
+    """对单条结果执行 AI 分析，返回带 analysis 字段的结果。
+
+    省成本策略：先用规则预判，明显低质量的（分数 <= 4）直接用规则结果，
+    不调 MiniMax，只把有潜力的结果送 AI 深度分析。
+    """
     from scripts.dedup import get_recent_events_for_brand
 
     brand = r.get("brand", "")
     is_industry = brand.startswith("[行业]")
+
+    # ── 规则预判（品牌新闻）：拦截明显低质量的，省 AI 调用 ──
+    if not is_industry:
+        pre_check = _fallback_analysis(r)
+        if pre_check.get("filter") or pre_check.get("relevance_score", 0) <= 4:
+            r["analysis"] = pre_check
+            return r
 
     if is_industry:
         prompt = build_industry_prompt(r)
@@ -137,12 +149,15 @@ def _analyze_single(r: dict, parser_fn) -> dict:
 
 
 def _analyze_single_fundraising(r: dict) -> dict:
-    """对单条融资结果执行 AI 分析"""
+    """对单条融资结果执行 AI 分析（走 MiniMax，省成本）"""
     track_name = r.get("track_name", "")
     prompt = build_fundraising_prompt(r, track_name)
 
-    if os.environ.get("DEER_API_KEY") or os.environ.get("MINIMAX_API_KEY"):
-        analysis = _call_openclaw_model(prompt)
+    if os.environ.get("MINIMAX_API_KEY"):
+        analysis = _call_minimax(prompt, parse_analysis_response)
+    elif os.environ.get("DEER_API_KEY"):
+        # MiniMax 不可用时回退到 Sonnet
+        analysis = _call_llm_api(prompt, parse_analysis_response)
     else:
         analysis = parse_fundraising_response("")
 
@@ -173,20 +188,22 @@ def analyze_with_openclaw(results: list[dict]) -> list[dict]:
 
 def _call_llm_api(prompt: str, parse_response, retries: int = 2):
     """
-    通用 LLM API 调用（DeerAPI 主 + MiniMax fallback）。
+    通用 LLM API 调用。
+    优先级：DeerAPI (Sonnet) > MiniMax-M1 > fallback
     parse_response: 接收原始文本，返回解析后的结果。
     """
     import requests
-    deer_key = os.environ.get("DEER_API_KEY", "")
-    if deer_key:
+
+    # ── 优先使用 CodeSome API (Claude Sonnet) ──
+    codesome_key = os.environ.get("CODESOME_API_KEY", "")
+    if codesome_key:
         for attempt in range(retries + 1):
             try:
                 resp = requests.post(
-                    "https://api.deerapi.com/v1/messages",
+                    "https://v3.codesome.cn/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {deer_key}",
+                        "Authorization": f"Bearer {codesome_key}",
                         "Content-Type": "application/json",
-                        "anthropic-beta": "compact-2026-01-12",
                     },
                     json={
                         "model": "claude-sonnet-4-6",
@@ -197,14 +214,51 @@ def _call_llm_api(prompt: str, parse_response, retries: int = 2):
                     timeout=30,
                 )
                 resp.raise_for_status()
-                content = resp.json().get("content", [{}])[0].get("text", "")
-                print(f"  [DeerAPI OK]", flush=True)
+                choices = resp.json().get("choices", [])
+                if choices and isinstance(choices[0], dict):
+                    content = choices[0].get("message", {}).get("content", "")
+                else:
+                    content = ""
+                print(f"  [CodeSome Sonnet OK]", flush=True)
                 return parse_response(content)
             except Exception as e:
-                print(f"  [DeerAPI 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
+                print(f"  [CodeSome Sonnet 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
                 if attempt < retries:
                     import time; time.sleep(2)
 
+    # ── 回退：DeerAPI (Claude Sonnet) ──
+    deer_key = os.environ.get("DEER_API_KEY", "")
+    if deer_key:
+        for attempt in range(retries + 1):
+            try:
+                resp = requests.post(
+                    "https://api.deerapi.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {deer_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "claude-sonnet-4-6",
+                        "max_tokens": 600,
+                        "temperature": 0.3,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                    timeout=30,
+                )
+                resp.raise_for_status()
+                choices = resp.json().get("choices", [])
+                if choices and isinstance(choices[0], dict):
+                    content = choices[0].get("message", {}).get("content", "")
+                else:
+                    content = ""
+                print(f"  [Sonnet OK]", flush=True)
+                return parse_response(content)
+            except Exception as e:
+                print(f"  [Sonnet 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
+                if attempt < retries:
+                    import time; time.sleep(2)
+
+    # ── 回退：MiniMax-Text-2.7 ──
     minimax_key = os.environ.get("MINIMAX_API_KEY", "")
     if minimax_key:
         for attempt in range(retries + 1):
@@ -216,7 +270,7 @@ def _call_llm_api(prompt: str, parse_response, retries: int = 2):
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "MiniMax-Text-01",
+                        "model": "MiniMax-M2.7",
                         "max_tokens": 600,
                         "temperature": 0.3,
                         "messages": [{"role": "user", "content": prompt}],
@@ -246,8 +300,45 @@ def _call_llm_raw(prompt: str, retries: int = 2) -> str:
 
 
 def _call_openclaw_model(prompt: str, retries: int = 2) -> dict:
-    """调用 DeerAPI 分析，失败 fallback MiniMax"""
+    """调用 AI 分析（Sonnet 优先）"""
     return _call_llm_api(prompt, parse_analysis_response, retries)
+
+
+def _call_minimax(prompt: str, parse_response, retries: int = 2):
+    """直接调用 MiniMax-Text-2.7（融资分析专用，不走 Sonnet）"""
+    import requests
+    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
+    if not minimax_key:
+        return parse_response("")
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(
+                "https://api.minimax.chat/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {minimax_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "MiniMax-M2.7",
+                    "max_tokens": 600,
+                    "temperature": 0.3,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            choices = resp.json().get("choices", [])
+            if choices and isinstance(choices[0], dict):
+                content = choices[0].get("message", {}).get("content", "")
+            else:
+                content = ""
+            print(f"  [MiniMax OK]", flush=True)
+            return parse_response(content)
+        except Exception as e:
+            print(f"  [MiniMax 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
+            if attempt < retries:
+                import time; time.sleep(2)
+    return parse_response("")
 
 
 
@@ -431,13 +522,15 @@ def _fallback_analysis(result: dict) -> dict:
 def run_pipeline(
     config: dict = None,
     include_industry: bool = None,
-    min_score: int = 6,
+    min_score: int = 7,
     dry_run: bool = False,
     profile_name: str = None,
     search_pool: dict = None,
     fundraising_results_raw: list = None,
     use_cache: bool = False,
     date_str: str = None,
+    time_range: str = "day",
+    first_run: bool = False,
 ) -> str:
     """
     执行完整 pipeline
@@ -449,6 +542,8 @@ def run_pipeline(
     fundraising_results_raw: 可选，预取的融资搜索结果（多档案模式下由主流程统一预取）
     use_cache: 为 True 时，跳过搜索，从存档加载结果重新分析（用于重新生成报告）
     date_str: 可选，指定存档日期（YYYY-MM-DD），默认为当天
+    time_range: 搜索时间窗口，"day"=今日，"year"=一年（首次运行使用）
+    first_run: 是否为首次运行（由 run_single_profile_pipeline 在存档保存前计算后传入）
     """
     if config is None:
         config = load_config()
@@ -466,6 +561,8 @@ def run_pipeline(
             config, include_industry, min_score, dry_run,
             profile_name, search_pool, fundraising_results_raw, use_cache,
             date_str=date_str,
+            time_range=time_range,
+            first_run=first_run,
         )
     finally:
         # 恢复默认 profile
@@ -476,6 +573,8 @@ def run_pipeline(
 def _run_pipeline_inner(
     config, include_industry, min_score, dry_run, profile_name, search_pool,
     fundraising_results_raw=None, use_cache=False, date_str: str = None,
+    time_range: str = "day",
+    first_run: bool = False,
 ) -> str:
     """
     run_pipeline 的核心逻辑（放在 try/finally 外层）。
@@ -483,13 +582,15 @@ def _run_pipeline_inner(
 
     use_cache: True 时跳过搜索，从 SQLite 存档加载结果重新分析。
     date_str: 存档日期，默认为当天。
+    time_range: 搜索时间窗口，"day"=今日，"year"=一年（首次运行使用）。
+    first_run: 是否为首次运行（由 run_single_profile_pipeline 在存档保存前计算后传入）。
     """
     brand_configs = config.get("brands", [])
     industry_configs = config.get("industries", [])
     fundraising_config = config.get("fundraising", {})
 
     if include_industry is None:
-        include_industry = is_weekly_industry_day()
+        include_industry = False  # 行业搜索默认关闭，需要时用 --industry 手动开启
 
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -537,6 +638,7 @@ def _run_pipeline_inner(
             brand_configs=brand_configs,
             industry_configs=industry_configs,
             include_industry=include_industry,
+            time_range=time_range,
         )
         print(f"  品牌+行业搜索结果: {len(raw_results)} 条")
 
@@ -612,11 +714,14 @@ def _run_pipeline_inner(
 
     # ── Step 5: 生成日报 ───────────────────────────────────
     print("\n[Step 5] 生成日报...")
+    # first_run 已由 run_single_profile_pipeline 在存档保存前计算并传入
     report = generate_full_report(
         analyzed_results=filtered,
-        fundraising_results=[r for r in analyzed if r.get("brand", "").startswith("[融资]")],
+        fundraising_results=[r for r in analyzed if r.get("brand", "").startswith("[融资]") and r.get("analysis", {}).get("relevance_score", 0) >= 7],
         date_str=date_str,
         profile_name=profile_name,
+        brand_configs=brand_configs,
+        is_first_run=first_run,
     )
     print(f"  日报生成完成，共 {len(report)} 字符")
 
@@ -646,7 +751,7 @@ def run_single_profile_pipeline(
     shared_config: dict = None,
     search_pool: dict = None,
     include_industry: bool = None,
-    min_score: int = 6,
+    min_score: int = 7,
     dry_run: bool = False,
     output_dir: str = None,
     fundraising_results_raw: list = None,
@@ -680,6 +785,16 @@ def run_single_profile_pipeline(
     print(f"[档案] {profile_name}")
     print(f"{'='*60}")
 
+    # 首次运行判断（必须在 run_pipeline 调用前完成，以便传入 generate_full_report）
+    first_run = is_first_run(profile_name) if profile_name and not use_cache else False
+
+    # 首次运行：查过去一年；后续查今日
+    if first_run and not use_cache:
+        time_range = "year"
+        print(f"  [首次运行] 扩展时间窗口为一年")
+    else:
+        time_range = "day"
+
     report = run_pipeline(
         config=config,
         include_industry=include_industry,
@@ -690,6 +805,8 @@ def run_single_profile_pipeline(
         fundraising_results_raw=fundraising_results_raw,
         use_cache=use_cache,
         date_str=date_str,
+        time_range=time_range,
+        first_run=first_run,
     )
 
     if report:
@@ -711,7 +828,7 @@ def run_single_profile_pipeline(
 
 def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False) -> list[str]:
     """
-    运行多个档案（使用搜索共享池优化 Tavily 消耗）。
+    运行多个档案（使用搜索共享池优化 Bocha 消耗）。
 
     profile_names: 指定档案列表，None=运行全部
     返回: 各档案报告字符串列表

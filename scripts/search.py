@@ -1,6 +1,6 @@
 """
-Tavily 搜索引擎封装
-负责根据品牌配置生成搜索查询，调用 Tavily API，返回结构化结果
+Bocha 搜索引擎封装
+负责根据品牌配置生成搜索查询，调用 Bocha API，返回结构化结果
 """
 
 import os
@@ -12,22 +12,57 @@ import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Optional
 
-# ── 搜索结果内存缓存（5分钟 TTL）─────────────────────────────
-_search_cache: dict[str, tuple[float, list[dict]]] = {}  # {query: (timestamp, results)}
+# ── 搜索结果缓存（内存 + 每日磁盘文件）─────────────────────────
+# 每天一个 JSON 文件，同一天内相同查询只调一次 Bocha API
+# 文件位置：data/search_cache/bocha_YYYY-MM-DD.json
+_DISK_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "search_cache")
+_disk_cache: dict = {}       # 当天磁盘缓存（启动时加载一次）
+_disk_cache_date: str = ""   # 已加载的日期
+
+
+def _ensure_disk_cache() -> dict:
+    """确保当天磁盘缓存已加载到内存（只读一次文件）"""
+    global _disk_cache, _disk_cache_date
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _disk_cache_date == today:
+        return _disk_cache
+    # 日期变了或首次加载
+    _disk_cache_date = today
+    path = os.path.join(_DISK_CACHE_DIR, f"bocha_{today}.json")
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _disk_cache = json.load(f)
+                print(f"  [缓存] 加载当天搜索缓存: {len(_disk_cache)} 条查询")
+        except Exception:
+            _disk_cache = {}
+    else:
+        _disk_cache = {}
+    return _disk_cache
+
+
+def _flush_disk_cache() -> None:
+    """将内存缓存写回磁盘文件"""
+    os.makedirs(_DISK_CACHE_DIR, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    path = os.path.join(_DISK_CACHE_DIR, f"bocha_{today}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(_disk_cache, f, ensure_ascii=False)
 
 
 def _get_cached(query: str, ttl: int = 300) -> Optional[list[dict]]:
-    """从缓存获取结果（未过期返回 results，过期或不存在返回 None）"""
-    if query in _search_cache:
-        ts, results = _search_cache[query]
-        if time.time() - ts < ttl:
-            return results
+    """从缓存获取结果（当天磁盘缓存，不过期）"""
+    cache = _ensure_disk_cache()
+    if query in cache:
+        return cache[query]
     return None
 
 
 def _set_cached(query: str, results: list[dict]) -> None:
-    """写入缓存"""
-    _search_cache[query] = (time.time(), results)
+    """写入缓存（内存 + 磁盘）"""
+    cache = _ensure_disk_cache()
+    cache[query] = results
+    _flush_disk_cache()
 
 # 加载 .env（如果环境变量未设置）
 _env_loaded = False
@@ -48,7 +83,6 @@ def _ensure_env():
 _ensure_env()
 
 
-TAVILY_ENDPOINT = "https://api.tavily.com/search"
 BOCHA_ENDPOINT = "https://api.bochaai.com/v1/web-search"
 
 _BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY", "")
@@ -98,11 +132,11 @@ def is_fundraising_day() -> bool:
 
 
 def get_api_key() -> str:
-    """优先返回 Tavily API key（Bocha 作为主引擎时仍需要备用）"""
+    """返回 Bocha API key"""
     _ensure_env()
-    key = os.environ.get("TAVILY_API_KEY", "")
+    key = os.environ.get("BOCHA_API_KEY", "")
     if not key:
-        raise ValueError("TAVILY_API_KEY 环境变量未设置")
+        raise ValueError("BOCHA_API_KEY 环境变量未设置")
     return key
 
 
@@ -153,37 +187,6 @@ def _search_bocha(
     return results
 
 
-def _search_tavily(
-    query: str,
-    api_key: str,
-    topic: str = "news",
-    time_range: str = "day",
-    search_depth: str = "basic",
-    max_results: int = 5,
-    include_domains: Optional[list] = None,
-    exclude_domains: Optional[list] = None,
-) -> list[dict]:
-    """调用 Tavily API 搜索"""
-    payload = {
-        "api_key": api_key,
-        "query": query,
-        "topic": topic,
-        "time_range": time_range,
-        "search_depth": search_depth,
-        "max_results": max_results,
-        "include_answer": False,
-    }
-    if include_domains:
-        payload["include_domains"] = include_domains
-    if exclude_domains:
-        payload["exclude_domains"] = exclude_domains
-
-    resp = requests.post(TAVILY_ENDPOINT, json=payload, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    return data.get("results", [])
-
-
 def search_tavily(
     query: str,
     api_key: str = None,
@@ -195,34 +198,36 @@ def search_tavily(
     exclude_domains: Optional[list] = None,
 ) -> list[dict]:
     """
-    主搜索函数：Bocha 优先，Tavily fallback。
-    api_key 参数兼容旧用法——如果传 Bocha key 则只用 Bocha，
-    否则尝试 Bocha（BOCHA_API_KEY），失败则用 Tavily。
+    主搜索函数：仅使用 Bocha，限流时自动等待重试。
+    函数名保留 search_tavily 以兼容已有调用。
     """
-    # 如果只传了 api_key 且是 Tavily 格式（兼容旧调用）
-    if api_key and not _get_bocha_key():
-        return _search_tavily(query, api_key, topic, time_range, search_depth, max_results, include_domains, exclude_domains)
+    bocha_key = api_key or _get_bocha_key()
+    if not bocha_key:
+        return []
 
-    # 优先 Bocha
-    bocha_key = _get_bocha_key()
-    if bocha_key:
+    max_retries = 3
+    for attempt in range(max_retries + 1):
         try:
             results = _search_bocha(query, bocha_key, time_range, max_results)
             if results:
                 print(f"  [Bocha OK] {len(results)} 条", flush=True)
                 return results
+            return []
+        except requests.exceptions.HTTPError as e:
+            # 429 限流：等待后重试
+            if e.response is not None and e.response.status_code == 429:
+                wait = 5 * (attempt + 1)  # 5s, 10s, 15s
+                print(f"  [Bocha 限流] 等待 {wait}s 后重试 ({attempt+1}/{max_retries})...", flush=True)
+                time.sleep(wait)
+                continue
+            print(f"  [Bocha 失败] {e}", flush=True)
+            return []
         except Exception as e:
             print(f"  [Bocha 失败] {e}", flush=True)
+            return []
 
-    # Fallback Tavily
-    tavily_key = api_key or get_api_key()
-    try:
-        results = _search_tavily(query, tavily_key, topic, time_range, search_depth, max_results, include_domains, exclude_domains)
-        print(f"  [Tavily OK] {len(results)} 条", flush=True)
-        return results
-    except Exception as e:
-        print(f"  [Tavily 失败] {e}", flush=True)
-        return []
+    print(f"  [Bocha 限流] 重试耗尽，跳过: {query[:40]}", flush=True)
+    return []
 
 
 def build_brand_queries(brand_config: dict) -> list[dict]:
@@ -238,9 +243,15 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     lang = brand_config.get("lang", "zh")
     all_names = list(set(sub_brands + [name]))
 
-    # 查询 1：主品牌 + 商机信号词
+    # 查询 1：主品牌 + 品牌配置里的所有关键词（不去引号，Bocha 空格=AND）
+    # 从配置里取除 lang/sub_brands 外的所有 key 作为关键词
+    signal_words = [k for k in keywords if k not in ("lang",)]
+    if signal_words:
+        signal_str = " OR ".join(signal_words[:10])  # 最多10个，控制查询长度
+    else:
+        signal_str = "新品 OR 营销 OR 广告"  # fallback
     queries.append({
-        "query": f'"{name}" 发布会 OR 新品 OR 代言人 OR 融资 OR 广告',
+        "query": f'{name} {signal_str}',
         "brand": name,
         "brand_names": all_names,
         "type": "brand_main",
@@ -250,7 +261,7 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     # 查询 2：重要子品牌（如果有不同于主品牌的子品牌）
     important_subs = [sb for sb in sub_brands if sb != name][:2]
     if important_subs:
-        sub_str = " OR ".join(f'"{sb}"' for sb in important_subs)
+        sub_str = " OR ".join(important_subs)
         queries.append({
             "query": f"({sub_str}) 新品 OR 发布 OR 上市",
             "brand": name,
@@ -341,7 +352,7 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
             topic="news",
             time_range=time_range,
             search_depth=search_depth,
-            max_results=5,
+            max_results=20,
             include_domains=include_domains,
         )
         _set_cached(cache_key, results)
@@ -386,15 +397,36 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
     return formatted
 
 
+def is_first_run(profile_name: str) -> bool:
+    """
+    判断是否为某档案的首次运行。
+    首次运行标准：data/profiles/{profile_name}/search_archive.db 不存在或为空。
+    """
+    if not profile_name:
+        return True
+    db_path = os.path.join(
+        os.path.dirname(__file__), "..", "data", "profiles", profile_name, "search_archive.db"
+    )
+    if not os.path.exists(db_path):
+        return True
+    # 检查文件是否为空（0字节）
+    if os.path.getsize(db_path) == 0:
+        return True
+    return False
+
+
 def run_search(
     brand_configs: list[dict],
     industry_configs: list[dict] = None,
     include_industry: bool = False,
     api_key: str = None,
+    time_range: str = "day",
 ) -> list[dict]:
     """
     执行完整搜索流程
     返回: [{brand, query, title, url, content, score, published_date, type}, ...]
+
+    time_range: 搜索时间窗口，"day"=今日，"week"=一周
     """
     if api_key is None:
         api_key = get_api_key()
@@ -406,7 +438,7 @@ def run_search(
         queries = build_brand_queries(brand_cfg)
         for q in queries:
             try:
-                results = _execute_query(q, api_key, time_range="day", search_depth="basic")
+                results = _execute_query(q, api_key, time_range=time_range, search_depth="basic")
                 all_results.extend(results)
             except Exception as e:
                 print(f"[搜索失败] {q['query']}: {e}")
@@ -466,7 +498,7 @@ def get_track_keywords(track_name: str) -> list[str]:
     获取某赛道的搜索关键词（LLM 生成 + 7 天缓存）。
 
     命中缓存且未过期 → 直接返回
-    缓存过期或不存在 → 调 DeerAPI 生成 → 缓存 → 返回
+    缓存过期或不存在 → 调 MiniMax 生成 → 缓存 → 返回
     LLM 调用失败 → 回退到基础关键词（赛道名本身 + 通用词）
     """
     cache = _load_keyword_cache()
@@ -498,7 +530,7 @@ def get_track_keywords(track_name: str) -> list[str]:
 
 
 def _generate_keywords_via_llm(track_name: str) -> list[str]:
-    """调 MiniMax 生成赛道关键词（主），DeerAPI fallback"""
+    """调 MiniMax-Text-2.7 生成赛道关键词"""
     try:
         import requests
         minimax_key = os.environ.get("MINIMAX_API_KEY", "")
@@ -510,7 +542,7 @@ def _generate_keywords_via_llm(track_name: str) -> list[str]:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "MiniMax-Text-01",
+                    "model": "MiniMax-Text-2.7",
                     "max_tokens": 200,
                     "temperature": 0.3,
                     "messages": [{
@@ -539,51 +571,6 @@ def _generate_keywords_via_llm(track_name: str) -> list[str]:
             return []
     except Exception as e:
         print(f"  [MiniMax关键词失败] {e}", flush=True)
-
-    # Fallback DeerAPI
-    try:
-        import requests
-        deer_key = os.environ.get("DEER_API_KEY", "")
-        if not deer_key:
-            return []
-
-        resp = requests.post(
-            "https://api.deerapi.com/v1/messages",
-            headers={
-                "Authorization": f"Bearer {deer_key}",
-                "Content-Type": "application/json",
-                "anthropic-beta": "compact-2026-01-12",
-            },
-            json={
-                "model": "claude-sonnet-4-6",
-                "max_tokens": 200,
-                "temperature": 0.3,
-                "messages": [{
-                    "role": "user",
-                    "content": f"给出「{track_name}」赛道在中国融资新闻中常见的5-8个搜索关键词。\n要求：多样化表达，覆盖不同新闻写法，纯中文，每行一个，不要编号，不要解释。\n示例输出：\n大模型\n生成式AI创业公司\n人工智能应用层公司\nAI独角兽\n大模型厂商\n智能助手应用"
-                }],
-            },
-            timeout=20,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        content = data.get("content", [{}])[0].get("text", "")
-
-        keywords = []
-        for line in content.strip().split("\n"):
-            line = line.strip().strip("-+*.0123456789. \t")
-            if line and len(line) >= 2:
-                keywords.append(line)
-        if keywords:
-            print(f"  [关键词生成(Deer)] {track_name}: {keywords}")
-            return keywords[:8]
-        return []
-    except Exception as e:
-        print(f"  [DeerAPI关键词失败] {e}", flush=True)
-        return []
-
-    except Exception as e:
-        print(f"  [关键词生成失败] {track_name}: {e}")
         return []
 
 

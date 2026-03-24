@@ -1,31 +1,316 @@
 {
   "AI大模型": {
     "k.sina.com.cn": {
-      "hits": 2,
-      "high_relevance_hits": 2,
-      "last_seen": "2026-03-22"
+      "hits": 6,
+      "high_relevance_hits": 6,
+      "last_seen": "2026-03-23"
     },
     "www.forbes.com": {
       "hits": 2,
       "high_relevance_hits": 2,
       "last_seen": "2026-03-22"
+    },
+    "news.qq.com": {
+      "hits": 7,
+      "high_relevance_hits": 7,
+      "last_seen": "2026-03-23"
+    },
+    "xw.qianzhan.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.chinabgao.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.huaon.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "user.guancha.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "bydrug.pharmcube.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "digi.china.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "m.chinabgao.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.stcn.com": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-23"
+    },
+    "www.chinairn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.36kr.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.askci.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "fgw.shandong.gov.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "sd.news.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "gxt.shandong.gov.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.163.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.chinanews.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "wallstreetcn.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "zw.china.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.jiemian.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.eeo.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "news.zol.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.nbd.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "tech.ifeng.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.sohu.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.thepaper.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "m.163.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "c.m.163.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.news.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
     }
   },
   "机器人/具身智能": {
     "www.jiemian.com": {
-      "hits": 2,
-      "high_relevance_hits": 2,
-      "last_seen": "2026-03-22"
+      "hits": 7,
+      "high_relevance_hits": 7,
+      "last_seen": "2026-03-23"
     },
     "www.163.com": {
-      "hits": 3,
-      "high_relevance_hits": 3,
-      "last_seen": "2026-03-22"
+      "hits": 16,
+      "high_relevance_hits": 16,
+      "last_seen": "2026-03-23"
     },
     "k.sina.com.cn": {
+      "hits": 7,
+      "high_relevance_hits": 7,
+      "last_seen": "2026-03-23"
+    },
+    "user.guancha.cn": {
       "hits": 2,
       "high_relevance_hits": 2,
-      "last_seen": "2026-03-22"
+      "last_seen": "2026-03-23"
+    },
+    "www.toutiao.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.askci.com": {
+      "hits": 4,
+      "high_relevance_hits": 4,
+      "last_seen": "2026-03-23"
+    },
+    "news.qq.com": {
+      "hits": 15,
+      "high_relevance_hits": 15,
+      "last_seen": "2026-03-23"
+    },
+    "m.tech.china.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.thepaper.cn": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "digi.china.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "m.chinabgao.com": {
+      "hits": 5,
+      "high_relevance_hits": 5,
+      "last_seen": "2026-03-23"
+    },
+    "m.chinairn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.chinabgao.com": {
+      "hits": 4,
+      "high_relevance_hits": 4,
+      "last_seen": "2026-03-23"
+    },
+    "www.36kr.com": {
+      "hits": 8,
+      "high_relevance_hits": 8,
+      "last_seen": "2026-03-23"
+    },
+    "www.21jingji.com": {
+      "hits": 5,
+      "high_relevance_hits": 5,
+      "last_seen": "2026-03-23"
+    },
+    "www.kankanews.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "adimg.ce.cn": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "m.163.com": {
+      "hits": 7,
+      "high_relevance_hits": 7,
+      "last_seen": "2026-03-23"
+    },
+    "www.cnstock.com": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-23"
+    },
+    "www.stcn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "sensor.ofweek.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "finance.sina.com.cn": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "capital.lenovo.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.nbd.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "finance.ifeng.com": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-23"
+    },
+    "stock.stockstar.com": {
+      "hits": 4,
+      "high_relevance_hits": 4,
+      "last_seen": "2026-03-23"
+    },
+    "m.askci.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "t.cj.sina.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "tech.ifeng.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "c.m.163.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "news.zol.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
     }
   },
   "消费电子": {
@@ -42,9 +327,179 @@
   },
   "户外运动": {
     "m.163.com": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-22"
+    }
+  },
+  "智能硬件/IoT": {
+    "finance.china.com.cn": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-23"
+    },
+    "www.toutiao.com": {
       "hits": 2,
       "high_relevance_hits": 2,
-      "last_seen": "2026-03-22"
+      "last_seen": "2026-03-23"
+    },
+    "www.thepaper.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "user.guancha.cn": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "news.qq.com": {
+      "hits": 5,
+      "high_relevance_hits": 5,
+      "last_seen": "2026-03-23"
+    },
+    "www.36kr.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.chinairn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.cs.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "finance.eastmoney.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.bjnews.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "k.sina.com.cn": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.stcn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.21jingji.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "finance.sina.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.askci.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    }
+  },
+  "运动户外": {
+    "news.qq.com": {
+      "hits": 6,
+      "high_relevance_hits": 6,
+      "last_seen": "2026-03-23"
+    },
+    "www.36kr.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "m.globalimporter.net": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.toutiao.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    }
+  },
+  "消费品": {
+    "c.m.163.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "www.ce.cn": {
+      "hits": 3,
+      "high_relevance_hits": 3,
+      "last_seen": "2026-03-23"
+    },
+    "www.xiancn.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    }
+  },
+  "睡眠经济": {
+    "hea.china.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "finance.eastmoney.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "k.sina.com.cn": {
+      "hits": 5,
+      "high_relevance_hits": 5,
+      "last_seen": "2026-03-23"
+    },
+    "m.163.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "c.m.163.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "yanjiao.jiaju.sina.com.cn": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    },
+    "wap.eastmoney.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "finance.stockstar.com": {
+      "hits": 2,
+      "high_relevance_hits": 2,
+      "last_seen": "2026-03-23"
+    },
+    "www.36kr.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
+    }
+  },
+  "医药大健康": {
+    "news.china.com": {
+      "hits": 1,
+      "high_relevance_hits": 1,
+      "last_seen": "2026-03-23"
     }
   }
 }

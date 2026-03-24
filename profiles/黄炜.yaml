@@ -1,7 +1,17 @@
-# 品牌监控配置
+# 黄炜 · 销售情报档案
+# 基于 default 配置，完全继承 config.yaml 的品牌/行业/融资追踪设置
 
+name: 黄炜
+
+# ===== 手机 3C =====
 brands:
-  # ===== 手机 3C =====
+  - name: OPPO
+    sub_brands: [OPPO, 一加, 真我, OPPO Find, OPPO Reno, OPPO A]
+    industry: 手机3C
+    keywords: [发布会, 新品, 代言人, 旗舰, 上市, 广告, 营销, 融资, 投资, CMO, 品牌总监]
+    competitors: [vivo, 华为, 荣耀, 小米, 苹果]
+    lang: zh
+
   - name: vivo
     sub_brands: [vivo, iQOO, NEX]
     industry: 手机3C
@@ -14,6 +24,13 @@ brands:
     industry: 消费电子
     keywords: [新品, 发布, 运动相机, 全景, 融资, 上市, 营销]
     competitors: [GoPro, DJI Action]
+    lang: [zh, en]
+
+  - name: 拓竹
+    sub_brands: [拓竹, Bambu Lab, BBL]
+    industry: 消费电子
+    keywords: [新品, 发布, 3D打印, 融资, 上市, 营销, 代言人]
+    competitors: [创想三维, Anycubic, Prusa, 闪铸]
     lang: [zh, en]
 
   # ===== 新能源汽车 =====
@@ -31,14 +48,6 @@ brands:
     competitors: [比亚迪, 长安, 东风, 吉利]
     lang: zh
 
-  # ===== 食品/粮油 =====
-  - name: 益海嘉里
-    sub_brands: [益海嘉里, 金龙鱼, 胡姬花, 欧丽薇兰, 香满园, 口福, 海皇, 元宝, 金味, 丰苑]
-    industry: 食品粮油
-    keywords: [新品, 广告, 营销, 代言人, 节日, 促销, 上市, 融资, 原材料, 食品安全]
-    competitors: [中粮, 鲁花, 福临门, 多力, 西王]
-    lang: zh
-
   # ===== AI/科技 =====
   - name: 千问
     sub_brands: [通义千问, 千问, Qwen, 淘宝闪购, 阿里云]
@@ -48,7 +57,6 @@ brands:
     lang: zh
 
 # 行业监控（低频宽搜，每周一、四）
-# 关键词聚焦商机信号：融资、发布会、品牌升级、大事件
 industries:
   - name: 3C数码
     keywords:
@@ -56,7 +64,6 @@ industries:
       - "华为 手机 发布会 上市"
       - "消费电子 融资 亿元"
       - "耳机 平板 智能手表 代言人"
-    # 分析框架：描述这个行业的分众机会分析角度
     analysis_perspective: |
       这个行业的市场竞争格局是什么？头部品牌的投放策略有何差异？
       新品发布的节奏是怎样的？代言人策略对品牌破圈有什么价值？
@@ -126,24 +133,19 @@ industries:
       SaaS公司的典型营销路径是什么？分众在其中的独特价值在哪里？
       哪些阶段的企服公司最可能选择分众？
 
+  - name: 3D打印
+    keywords:
+      - "消费级3D打印 融资 亿元 2026"
+      - "桌面级3D打印 品牌 营销 破圈"
+      - "3D打印笔 新品 发布 代言人"
+      - "创客教育 3D打印 融资 市场"
+    analysis_perspective: |
+      消费级3D打印正处于品类教育期，分众的写字楼盘场景是否能帮助品牌完成从极客到大众的跨越？
+      融资后的消费级3D打印品牌如何快速建立大众认知？
+      哪些消费级3D打印品牌最有可能选择分众？
+
 # 融资专项监控（每周一、四运行）
-# 聚焦融资后有品牌推广需求的科技赛道
 fundraising:
-  # 搜集窗口说明：
-  #   周一推送 → 覆盖上周四至周一的融资动态
-  #   周四推送 → 覆盖周一至周四的融资动态
-  schedule:
-    - monday: "上周四 00:00 至 周一 08:00 的融资动态"
-    - thursday: "本周一 00:00 至 周四 08:00 的融资动态"
-
-  # 融资阶段权重：越早介入可能越大，但确定性越低
-  stages:
-    - seed: "种子/天使轮 - 观察期，3个月后跟进"
-    - series_a: "A轮 - 产品跑通，快速扩张，立即接触"
-    - series_b: "B轮 - 规模化，预算释放，抢大单"
-    - series_c: "C轮及以上 - 有钱任性，广告凶猛"
-
-  # 赛道权重：和营销越近、越需要打C端品牌的赛道，分众机会越大
   tracks:
     - name: AI大模型
       priority: 9
@@ -169,25 +171,3 @@ fundraising:
       priority: 4
       reason: "排除纯B端，聚焦有消费者产品线的半导体企业"
       focus_signal: "消费级芯片新品发布、品牌升级动作"
-
-  # 排除赛道（和营销关联弱）
-  excluded_tracks:
-    - "出行/共享出行"
-    - "物流/同城配送"
-    - "教育培训"
-    - "医疗健康（纯B端）"
-    - "游戏（政策风险高）"
-
-# 搜索配置
-search:
-  bocha_api_key_env: BOCHA_API_KEY
-  daily_max_credits: 50
-  weekly_max_credits: 30
-  results_per_query: 20
-  news_time_range: day
-
-# 日报配置
-report:
-  schedule: "08:00"
-  skip_if_empty: true
-  output_format: markdown

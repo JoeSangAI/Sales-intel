@@ -1,0 +1,102 @@
+name: 皮俊坤
+brands:
+- name: 中国药材
+  sub_brands:
+  - 枣仁安神胶囊
+  - 中国药材品牌全系列
+  industry: 医药大健康
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 上市
+  - 营销
+  - 广告
+  - 融资
+  - 药店
+  - 处方药
+  - OTC
+  competitors:
+  - 同仁堂
+  - 九芝堂
+  - 云南白药
+  - 华润三九
+  - 步长制药
+  lang: zh
+- name: UTO悠途
+  sub_brands: []
+  industry: 睡眠经济
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 上市
+  - 营销
+  - 广告
+  - 融资
+  - 睡眠科技
+  - 睡眠监测
+  competitors:
+  - 喜临门
+  - 慕思
+  - 顾家家居
+  - 梦百合
+  lang: zh
+- name: 必迈
+  sub_brands: []
+  industry: 运动户外
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 上市
+  - 营销
+  - 广告
+  - 融资
+  - 跑步
+  - 运动鞋服
+  competitors:
+  - 安踏
+  - 李宁
+  - 特步
+  - 361度
+  - 耐克
+  - 阿迪达斯
+  lang: zh
+industries:
+- name: 医药大健康
+  keywords:
+  - 医药 融资 亿元 2026
+  - 大健康 品牌 营销 广告 2026
+  - 制药企业 新品 发布 上市
+  - 药店 扩张 融资 2026
+  - 中药 品牌升级 市场动作
+  analysis_perspective: '医药大健康品牌正从传统渠道向大众市场扩散，分众医院的封闭空间能否触达患者决策链？
+    融资后品牌为何必须打广告？C端医药产品的用户获取逻辑是什么？
+    '
+- name: 睡眠经济
+  keywords:
+  - 睡眠经济 融资 亿元 2026
+  - 睡眠科技 智能睡眠 新品 发布
+  - 失眠 睡眠障碍 品牌 营销
+  analysis_perspective: '睡眠经济品牌正从功能需求向生活方式升级，分众社区+写字楼双覆盖是否匹配目标人群？
+    融资到账后品牌的营销预算决策如何？
+    '
+- name: 运动户外
+  keywords:
+  - 运动鞋服 融资 亿元 2026
+  - 户外品牌 新品 发布 代言人
+  - 体育用品 品牌升级 市场动作
+  - 跑步健身 品牌 营销 广告
+  analysis_perspective: '运动品牌正从小众精英向大众市场扩散，分众社区场景能否触达运动健身人群？
+    '
+fundraising:
+  tracks:
+  - name: 医药大健康
+    priority: 8
+  - name: 睡眠经济
+    priority: 7
+  - name: 运动户外
+    priority: 6
+  - name: 消费品
+    priority: 6

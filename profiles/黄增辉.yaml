@@ -1,0 +1,78 @@
+# 档案：黄增辉
+
+name: 黄增辉
+
+brands:
+  # 五界（智选车模式）
+  - name: 问界
+    sub_brands: [问界, SERES, 问界M5, 问界M7, 问界M8, 问界M9, 问界M6]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 代言人, 广告, 营销, 补贴, 销量, 智驾, 鸿蒙座舱]
+    competitors: [理想, 蔚来, 小鹏, 特斯拉, 比亚迪]
+    lang: zh
+
+  - name: 智界
+    sub_brands: [智界, LUXEED, 智界S7, 智界R7, 智界V9, 智界R9]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 代言人, 广告, 营销, 补贴, 销量, 智驾, 鸿蒙座舱, V9, MPV]
+    competitors: [理想, 蔚来, 小鹏, 特斯拉, 比亚迪, 极氪]
+    lang: zh
+
+  - name: 享界
+    sub_brands: [享界, MAEXTRO, 享界S9, 享界S9T, 享界R7]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 代言人, 广告, 营销, 补贴, 销量, 智驾, 鸿蒙座舱]
+    competitors: [比亚迪, 蔚来, 理想, 奔驰, 宝马]
+    lang: zh
+
+  - name: 尚界
+    sub_brands: [尚界, 尚界H5, ES39]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 代言人, 广告, 营销, 补贴, 销量, 智驾, 鸿蒙座舱]
+    competitors: [比亚迪, 吉利, 长安, 长城]
+    lang: zh
+
+  - name: 尊界
+    sub_brands: [尊界, MAIC, 尊界S800]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 代言人, 广告, 营销, 补贴, 销量, 智驾, 鸿蒙座舱, 百万, 豪华]
+    competitors: [迈巴赫, 宾利, 劳斯莱斯, 仰望]
+    lang: zh
+
+  # 三境（HI模式）
+  - name: 奕境
+    sub_brands: [奕境, 东风奕派, 奕派]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 广告, 营销, 销量, 智驾, 乾崑]
+    competitors: [比亚迪, 吉利, 长安]
+    lang: zh
+
+  - name: 启境
+    sub_brands: [启境, 广汽启境]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 广告, 营销, 销量, 智驾, 乾崑]
+    competitors: [比亚迪, 蔚来, 理想]
+    lang: zh
+
+  - name: 华境
+    sub_brands: [华境, 五菱华境]
+    industry: 新能源汽车
+    keywords: [新车, 发布会, 上市, 广告, 营销, 销量, 智驾, 乾崑]
+    competitors: [比亚迪, 吉利, 长安, 五菱]
+    lang: zh
+
+industries:
+  - name: 新能源汽车
+    keywords:
+      - "问界 智界 享界 尚界 尊界 新车 发布"
+      - "鸿蒙智行 五界三境 发布会 上市"
+      - "智界V9 MPV 官宣 发布"
+      - "新能源汽车 销量 融资 亿元"
+      - "华为 乾崑智驾 ADS 发布 合作"
+
+fundraising:
+  tracks:
+    - name: 新能源汽车/智能汽车
+      priority: 9
+      reason: "鸿蒙智行五界三境均为新能源汽车/智能汽车品牌，融资后有强烈品牌推广需求"
+      focus_signal: "鸿蒙智行五界三境新车发布、销量破万、融资合作"
