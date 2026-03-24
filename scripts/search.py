@@ -230,6 +230,55 @@ def search_tavily(
     return []
 
 
+def _search_toutiao(query: str, max_results: int = 5) -> list[dict]:
+    """
+    今日头条搜索 - 解析头条搜索结果获取真实文章URL
+    头条搜索结果包含 article.zlink.toutiao.com 重定向，
+    通过解码 h5_url 参数获取原始文章URL。
+    """
+    import urllib.parse
+    import re as re_module
+    try:
+        encoded_q = urllib.parse.quote(query)
+        search_url = f"https://so.toutiao.com/search?keyword={encoded_q}&source=input"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        }
+        resp = requests.get(search_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            return []
+
+        html = resp.text
+        results = []
+
+        # 从重定向链接中提取真实文章URL
+        zlink_pattern = re_module.compile(r'(article\.zlink\.toutiao\.com/[^\s"\'<>]+)')
+        seen_urls = set()
+
+        for match in zlink_pattern.findall(html):
+            try:
+                decoded = urllib.parse.unquote(urllib.parse.unquote(match))
+                h5_match = re_module.search(r'h5_url=([^\s&]+)', decoded)
+                if h5_match:
+                    actual_url = urllib.parse.unquote(h5_match.group(1))
+                    if actual_url not in seen_urls and actual_url.startswith('http'):
+                        seen_urls.add(actual_url)
+                        results.append({
+                            "title": f"头条文章: {query}",
+                            "url": actual_url,
+                            "content": f"来源: 今日头条 | 关键词: {query}",
+                            "score": 0.0,
+                            "published_date": "",
+                        })
+            except Exception:
+                continue
+
+        return results[:max_results]
+    except Exception as e:
+        return []
+
+
 def build_brand_queries(brand_config: dict) -> list[dict]:
     """根据品牌配置生成搜索查询列表
 
@@ -270,7 +319,17 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
             "lang": "zh",
         })
 
-    # 查询 3：英文查询（仅限标记了 en 的品牌）
+    # 查询 3：微信公众号/今日头条搜索（通过今日头条获取高质量文章URL）
+    signal_for_wechat = " OR ".join(signal_words[:5]) if signal_words else "新品 OR 营销"
+    queries.append({
+        "query": f"{name} {signal_for_wechat}",
+        "brand": name,
+        "brand_names": all_names,
+        "type": "brand_wechat",
+        "lang": "zh",
+    })
+
+    # 查询 4：英文查询（仅限标记了 en 的品牌）
     if isinstance(lang, list) and "en" in lang:
         queries.append({
             "query": f'"{name}" new product OR launch OR marketing OR campaign 2026',
