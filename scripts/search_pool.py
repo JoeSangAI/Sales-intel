@@ -13,7 +13,7 @@ from scripts.search import (
     build_brand_queries, build_industry_queries,
     build_fundraising_queries,
     get_api_key, search_tavily, _is_noise_url,
-    _is_good_domain, _search_toutiao,
+    _search_toutiao, ZH_NEWS_DOMAINS, ZH_FUNDRAISING_DOMAINS,
 )
 
 _SHARED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shared")
@@ -138,9 +138,13 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
                 url = r.get("url", "")
                 if _is_noise_url(url):
                     continue
-                # 品牌查询强制要求高质量域名（微信公众号/36氪/今日头条等）
-                if qtype in ("brand_main", "sub_brand", "brand_en", "brand_wechat"):
-                    if not _is_good_domain(url, require_news_domain=True):
+                # 品牌查询强制要求高质量域名（中文新闻源白名单）
+                if qtype in ("brand_main", "brand_biz", "sub_brand", "brand_en"):
+                    if not any(d in url for d in ZH_NEWS_DOMAINS):
+                        continue
+                # 融资查询使用融资专用白名单
+                if qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
+                    if not any(d in url for d in ZH_FUNDRAISING_DOMAINS):
                         continue
                 item = {
                     "brand": q["brand"],

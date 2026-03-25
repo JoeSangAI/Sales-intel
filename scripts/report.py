@@ -253,6 +253,14 @@ def _format_cluster(cluster: list[dict], date_str: str = "") -> list[str]:
     if not title:
         title = "新动态"
 
+    # 事件类型标签
+    event_type = ""
+    for it in cluster:
+        et = it.get("analysis", {}).get("event_type", "")
+        if et:
+            event_type = et
+            break
+
     # 推荐跟进理由
     rec_reason = ""
     for it in cluster:
@@ -270,10 +278,9 @@ def _format_cluster(cluster: list[dict], date_str: str = "") -> list[str]:
             break
 
     lines = []
-    # 标题行
-    count_str = f"，{len(cluster)} 篇报道" if len(cluster) > 1 else ""
-    date_suffix = f" · {date_str}" if date_str else ""
-    lines.append(f"- **{title}**（{score}/10{count_str}{date_suffix}）")
+    # 标题行：事件类型 · 核心信息
+    type_tag = f"【{event_type}】" if event_type else ""
+    lines.append(f"- {type_tag}**{title}**（{score}/10）")
     lines.append("")
     # 核心内容
     if intel_summary:
@@ -795,6 +802,31 @@ def generate_full_report(
         title += f" · {profile_name}"
     lines = [title, ""]
 
+    # ── 顶部速览 ──
+    brand_items_all = [r for r in analyzed_results if not r.get("brand", "").startswith("[")]
+    red_brand = sum(1 for r in brand_items_all if r.get("analysis", {}).get("urgency") == "🔴")
+    yellow_brand = sum(1 for r in brand_items_all if r.get("analysis", {}).get("urgency") == "🟡")
+    red_fr = sum(1 for r in (fundraising_results or []) if r.get("analysis", {}).get("urgency") == "🔴")
+    yellow_fr = sum(1 for r in (fundraising_results or []) if r.get("analysis", {}).get("urgency") == "🟡")
+    # 有新闻的品牌（不含行业/融资标签）
+    brands_active = sorted(set(
+        r.get("brand", "") for r in analyzed_results
+        if not r.get("brand", "").startswith("[")
+        and r.get("analysis", {}).get("urgency") in ("🔴", "🟡")
+    ))
+    summary_parts = []
+    news_count = red_brand + yellow_brand
+    if news_count:
+        summary_parts.append(f"客户新闻 {news_count} 条")
+    fr_count = red_fr + yellow_fr
+    if fr_count:
+        summary_parts.append(f"融资线索 {fr_count} 条")
+    if brands_active:
+        summary_parts.append(f"涉及：{'、'.join(brands_active)}")
+    if summary_parts:
+        lines.append(f"> {' ｜ '.join(summary_parts)}")
+        lines.append("")
+
     # ── 1. 客户动态（仅品牌监控，不含行业） ──
     brand_items = [r for r in analyzed_results if not r.get("brand", "").startswith("[")]
 
@@ -838,18 +870,14 @@ def generate_full_report(
                 lines.extend(_format_cluster(cluster, date_str))
                 lines.append("")
 
-    # ── 无新闻品牌提示 ──
+    # ── 无新闻品牌提示（压缩为一行） ──
     if brand_configs:
         brands_with_news = set(brand_by_name.keys())
         brands_monitored = {cfg["name"] for cfg in brand_configs}
         brands_no_news = brands_monitored - brands_with_news
         if brands_no_news:
             lines.append("")
-            lines.append("### 暂无动态")
-            lines.append("")
-            time_window = "过去一年" if is_first_run else "今日"
-            for brand in sorted(brands_no_news):
-                lines.append(f"- **{brand}**：{time_window}内暂无和营销广告方向相关的咨询值得关注")
+            lines.append(f"暂无动态：{'、'.join(sorted(brands_no_news))}")
             lines.append("")
 
     # ── 2. 融资速报 ──

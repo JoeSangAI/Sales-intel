@@ -282,7 +282,7 @@ def _search_toutiao(query: str, max_results: int = 5) -> list[dict]:
 def build_brand_queries(brand_config: dict) -> list[dict]:
     """根据品牌配置生成搜索查询列表
 
-    策略：聚焦品牌本身的动态，不做宽泛的竞品搜索（噪音太大）。
+    策略：短查询 + 多角度覆盖，每条查询关键词不超过3个（Bocha 对长 OR 查询支持差）。
     每个品牌最多 3 条查询，控制 API 消耗。
     """
     queries = []
@@ -292,22 +292,30 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     lang = brand_config.get("lang", "zh")
     all_names = list(set(sub_brands + [name]))
 
-    # 查询 1：主品牌 + 品牌配置里的所有关键词（不去引号，Bocha 空格=AND）
-    # 从配置里取除 lang/sub_brands 外的所有 key 作为关键词
-    signal_words = [k for k in keywords if k not in ("lang",)]
-    if signal_words:
-        signal_str = " OR ".join(signal_words[:10])  # 最多10个，控制查询长度
-    else:
-        signal_str = "新品 OR 营销 OR 广告"  # fallback
+    # 查询 1：品牌 + 高价值信号词（短查询，最多3个 OR）
+    high_signals = [k for k in keywords if k in ("发布会", "新品", "代言人", "新车", "品牌升级", "广告", "营销")]
+    if not high_signals:
+        high_signals = ["新品", "营销", "广告"]
     queries.append({
-        "query": f'{name} {signal_str}',
+        "query": f'{name} {" OR ".join(high_signals[:3])}',
         "brand": name,
         "brand_names": all_names,
         "type": "brand_main",
         "lang": "zh",
     })
 
-    # 查询 2：重要子品牌（如果有不同于主品牌的子品牌）
+    # 查询 2：品牌 + 商业动态信号（融资/合作/上市等）
+    biz_signals = [k for k in keywords if k in ("融资", "投资", "上市", "合作", "签约", "CMO", "品牌总监")]
+    if biz_signals:
+        queries.append({
+            "query": f'{name} {" OR ".join(biz_signals[:3])}',
+            "brand": name,
+            "brand_names": all_names,
+            "type": "brand_biz",
+            "lang": "zh",
+        })
+
+    # 查询 3：重要子品牌（如果有不同于主品牌的子品牌）
     important_subs = [sb for sb in sub_brands if sb != name][:2]
     if important_subs:
         sub_str = " OR ".join(important_subs)
@@ -318,16 +326,6 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
             "type": "sub_brand",
             "lang": "zh",
         })
-
-    # 查询 3：微信公众号/今日头条搜索（通过今日头条获取高质量文章URL）
-    signal_for_wechat = " OR ".join(signal_words[:5]) if signal_words else "新品 OR 营销"
-    queries.append({
-        "query": f"{name} {signal_for_wechat}",
-        "brand": name,
-        "brand_names": all_names,
-        "type": "brand_wechat",
-        "lang": "zh",
-    })
 
     # 查询 4：英文查询（仅限标记了 en 的品牌）
     if isinstance(lang, list) and "en" in lang:
@@ -362,38 +360,70 @@ def build_industry_queries(industry_config: dict) -> list[dict]:
 
 # 中文新闻源域名白名单（提高中文搜索质量）
 ZH_NEWS_DOMAINS = [
+    # 一线财经/科技媒体
     "36kr.com", "jiemian.com", "thepaper.cn", "sina.com.cn",
     "163.com", "qq.com", "sohu.com", "ifeng.com",
     "caixin.com", "yicai.com", "cls.cn", "wallstreetcn.com",
     "huxiu.com", "tmtpost.com", "geekpark.net", "leiphone.com",
     "ithome.com", "cnbeta.com.tw", "cnr.cn", "xinhuanet.com",
-    "autohome.com.cn", "pcauto.com.cn", "dongchedi.com",
     "k.sina.com.cn",
+    # 汽车垂类
+    "autohome.com.cn", "pcauto.com.cn", "dongchedi.com",
+    # 投融资/创投媒体
+    "donews.com", "pedaily.cn", "chinaventure.com.cn",
+    "itjuzi.com", "iheima.com", "cyzone.cn",
+    # 官方/权威
+    "ce.cn", "stcn.com", "cnstock.com", "eastmoney.com",
+    "china.com.cn", "chinanews.com.cn",
+    # 科技/消费
+    "guancha.cn", "pingwest.com", "jiqizhixin.com",
+]
+
+# 融资新闻专用域名白名单（比品牌白名单更宽，包含创投媒体）
+ZH_FUNDRAISING_DOMAINS = ZH_NEWS_DOMAINS + [
+    "finance.sina.com.cn", "finance.ifeng.com",
+    "chuangye.com", "vc.cn", "newseed.cn",
 ]
 
 # URL 噪音模式：匹配到的直接丢弃
 _NOISE_URL_PATTERNS = [
     "/search", "/tag/", "/tags/", "/search-list/",
     "/category/", "/topics/", "/Solution/ListDetail/",
-    "/ask/",
+    "/ask/", "/authors/",
     "baike.baidu.com", "zhidao.baidu.com", "wenku.baidu.com",
     "wikipedia.org", "eschool.qq.com",
     "pitchhub.36kr.com",
 ]
 
+# 低质量域名黑名单：行业报告/数据站/SEO 站，不是新闻事件
+_NOISE_DOMAINS = [
+    "chinairn.com", "chinabgao.com", "askci.com",      # 行业报告站
+    "stockstar.com", "stock.sohu.com",                   # 股票论坛
+    "trustexporter.com", "globalimporter.net",           # 外贸B2B
+    "topnews.cn",                                         # SEO 聚合
+    "bbs.q.sina.com.cn",                                  # 论坛
+    "winshang.com",                                       # 商业地产
+]
+
 
 def _is_noise_url(url: str) -> bool:
-    """判断 URL 是否为列表页/标签页/百科等噪音"""
-    return any(p in url for p in _NOISE_URL_PATTERNS)
+    """判断 URL 是否为列表页/标签页/百科/低质量域名等噪音"""
+    if any(p in url for p in _NOISE_URL_PATTERNS):
+        return True
+    if any(d in url for d in _NOISE_DOMAINS):
+        return True
+    return False
 
 
 def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) -> list[dict]:
     """执行单条查询，过滤噪音 URL，格式化结果（带 5 分钟缓存）"""
     qtype = q.get("type", "")
 
-    # 域名限制：行业/融资搜索不限制（让 Tavily 自由搜索，信息源发现交给 AI 过滤）
-    if qtype in ("industry", "fundraising_amount", "fundraising_news", "fundraising_detail"):
+    # 域名限制：融资搜索用融资专用白名单，行业搜索不限制但后续由 _is_noise_url 过滤
+    if qtype in ("industry",):
         include_domains = None
+    elif qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
+        include_domains = None  # Bocha 不支持 include_domains，由后处理过滤
     elif q.get("lang") == "zh":
         include_domains = ZH_NEWS_DOMAINS
     else:
@@ -432,11 +462,17 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
         # ── 品牌查询的主体过滤 ──────────────────────────
         # 品牌搜索结果必须在标题或内容前200字中包含品牌名/子品牌名
         # 否则是搜索引擎返回的不相关结果（如搜 vivo 返回维密新闻）
-        if qtype in ("brand_main", "sub_brand", "brand_en"):
+        if qtype in ("brand_main", "brand_biz", "sub_brand", "brand_en"):
             brand_names = q.get("brand_names", [q.get("brand", "")])
             text_to_check = f"{title} {content[:200]}"
             if not any(bn and bn.lower() in text_to_check.lower() for bn in brand_names):
                 continue  # 品牌名不在标题和内容前200字中，丢弃
+
+        # ── 融资查询的域名质量过滤 ──────────────────────────
+        # 融资新闻必须来自可信媒体，过滤行业报告站/SEO站
+        if qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
+            if not any(d in url for d in ZH_FUNDRAISING_DOMAINS):
+                continue
 
         item = {
             "brand": q["brand"],
@@ -644,7 +680,8 @@ def build_fundraising_queries(fundraising_config: dict) -> list[dict]:
 
     策略：
     - 每赛道通过 LLM 生成多样化的搜索关键词（7天缓存）
-    - 每个关键词生成 1 条查询，不加 site: 限制（让 Tavily 自由搜索）
+    - 短查询 + 动作词（完成/获得），精准命中实际融资事件而非行业综述
+    - 每赛道最多 4 个关键词，控制 API 消耗
     """
     queries = []
     tracks = fundraising_config.get("tracks", [])
@@ -656,9 +693,9 @@ def build_fundraising_queries(fundraising_config: dict) -> list[dict]:
         if not keywords:
             keywords = [_clean_track_name(raw_name)]
 
-        for kw in keywords:
+        for kw in keywords[:4]:
             queries.append({
-                "query": f'"{kw}" 融资 亿元 2026',
+                "query": f'{kw} 完成 OR 获得 融资 亿',
                 "brand": f"[融资]{raw_name}",
                 "track_name": raw_name,
                 "priority": track.get("priority", 5),

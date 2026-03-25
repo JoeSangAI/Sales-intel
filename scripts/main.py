@@ -8,6 +8,8 @@ import sys
 import json
 import yaml
 import argparse
+import subprocess
+import tempfile
 import concurrent.futures
 from datetime import datetime
 
@@ -32,6 +34,66 @@ def _load_dotenv():
 
 _load_dotenv()
 
+
+def md_to_pdf(md_path: str) -> str:
+    """将 Markdown 文件转为 PDF（通过 Chrome headless），返回 PDF 路径。"""
+    import markdown2
+
+    css = (
+        'body { font-family: "PingFang SC","Heiti SC",sans-serif; font-size: 13px; '
+        'line-height: 1.8; padding: 30px 40px; color: #333; max-width: 800px; margin: 0 auto; }'
+        'h1 { font-size: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; color: #1e3a5f; }'
+        'h2 { font-size: 17px; color: #1e40af; margin-top: 28px; }'
+        'h3 { font-size: 15px; color: #374151; margin-top: 20px; }'
+        'h4 { font-size: 14px; color: #4b5563; }'
+        'a { color: #2563eb; text-decoration: none; }'
+        'table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }'
+        'th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }'
+        'th { background: #f3f4f6; font-weight: 600; }'
+        'blockquote { border-left: 3px solid #2563eb; padding-left: 12px; color: #555; '
+        'margin: 12px 0; background: #f8fafc; padding: 8px 12px; }'
+        'ul { padding-left: 20px; } li { margin-bottom: 8px; }'
+        'hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }'
+    )
+
+    chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    if not os.path.exists(chrome):
+        print(f"  [PDF] Chrome 未找到，跳过 PDF 生成")
+        return ""
+
+    with open(md_path, "r", encoding="utf-8") as f:
+        md_content = f.read()
+
+    html = markdown2.markdown(md_content, extras=["tables", "fenced-code-blocks"])
+    full_html = f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>{css}</style></head><body>{html}</body></html>'
+
+    tmp_html = tempfile.mktemp(suffix=".html")
+    with open(tmp_html, "w", encoding="utf-8") as f:
+        f.write(full_html)
+
+    pdf_path = md_path.rsplit(".", 1)[0] + ".pdf"
+    try:
+        subprocess.run(
+            [chrome, "--headless", "--disable-gpu", "--no-sandbox",
+             f"--print-to-pdf={pdf_path}", "--print-to-pdf-no-header", tmp_html],
+            capture_output=True, timeout=30,
+        )
+        if os.path.exists(pdf_path):
+            size_kb = os.path.getsize(pdf_path) // 1024
+            print(f"  [PDF] 已生成: {os.path.basename(pdf_path)} ({size_kb}KB)")
+        else:
+            print(f"  [PDF] 生成失败")
+            pdf_path = ""
+    except Exception as e:
+        print(f"  [PDF] 生成异常: {e}")
+        pdf_path = ""
+    finally:
+        if os.path.exists(tmp_html):
+            os.unlink(tmp_html)
+
+    return pdf_path
+
+
 from scripts.search import (
     run_search, get_api_key,
     run_fundraising_search,
@@ -54,6 +116,9 @@ from scripts.search_pool import (
     collect_all_queries, execute_shared_search,
     distribute_results, collect_single_profile_queries,
 )
+
+# CodeSome 503 熔断：一次 503 后整个 session 跳过，避免每条都重试浪费时间
+_codesome_disabled = False
 
 
 def load_config(config_path: str = None) -> dict:
@@ -139,7 +204,7 @@ def _analyze_single(r: dict, parser_fn) -> dict:
         recent_events = get_recent_events_for_brand(brand)
         prompt = build_analysis_prompt(r, recent_events=recent_events)
 
-    if os.environ.get("DEER_API_KEY") or os.environ.get("MINIMAX_API_KEY"):
+    if os.environ.get("CODESOME_API_KEY") or os.environ.get("MINIMAX_API_KEY"):
         analysis = _call_openclaw_model(prompt)
     else:
         analysis = _fallback_analysis(r)
@@ -155,8 +220,8 @@ def _analyze_single_fundraising(r: dict) -> dict:
 
     if os.environ.get("MINIMAX_API_KEY"):
         analysis = _call_minimax(prompt, parse_analysis_response)
-    elif os.environ.get("DEER_API_KEY"):
-        # MiniMax 不可用时回退到 Sonnet
+    elif os.environ.get("CODESOME_API_KEY"):
+        # MiniMax 不可用时回退到 CodeSome Sonnet
         analysis = _call_llm_api(prompt, parse_analysis_response)
     else:
         analysis = parse_fundraising_response("")
@@ -189,74 +254,46 @@ def analyze_with_openclaw(results: list[dict]) -> list[dict]:
 def _call_llm_api(prompt: str, parse_response, retries: int = 2):
     """
     通用 LLM API 调用。
-    优先级：DeerAPI (Sonnet) > MiniMax-M1 > fallback
+    优先级：CodeSome (Sonnet) > MiniMax > fallback
     parse_response: 接收原始文本，返回解析后的结果。
     """
     import requests
+    global _codesome_disabled
 
     # ── 优先使用 CodeSome API (Claude Sonnet) ──
     codesome_key = os.environ.get("CODESOME_API_KEY", "")
-    if codesome_key:
-        for attempt in range(retries + 1):
-            try:
-                resp = requests.post(
-                    "https://v3.codesome.cn/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {codesome_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "claude-sonnet-4-6",
-                        "max_tokens": 600,
-                        "temperature": 0.3,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=30,
-                )
-                resp.raise_for_status()
-                choices = resp.json().get("choices", [])
-                if choices and isinstance(choices[0], dict):
-                    content = choices[0].get("message", {}).get("content", "")
-                else:
-                    content = ""
-                print(f"  [CodeSome Sonnet OK]", flush=True)
-                return parse_response(content)
-            except Exception as e:
-                print(f"  [CodeSome Sonnet 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
-                if attempt < retries:
-                    import time; time.sleep(2)
-
-    # ── 回退：DeerAPI (Claude Sonnet) ──
-    deer_key = os.environ.get("DEER_API_KEY", "")
-    if deer_key:
-        for attempt in range(retries + 1):
-            try:
-                resp = requests.post(
-                    "https://api.deerapi.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {deer_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "claude-sonnet-4-6",
-                        "max_tokens": 600,
-                        "temperature": 0.3,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=30,
-                )
-                resp.raise_for_status()
-                choices = resp.json().get("choices", [])
-                if choices and isinstance(choices[0], dict):
-                    content = choices[0].get("message", {}).get("content", "")
-                else:
-                    content = ""
-                print(f"  [Sonnet OK]", flush=True)
-                return parse_response(content)
-            except Exception as e:
-                print(f"  [Sonnet 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
-                if attempt < retries:
-                    import time; time.sleep(2)
+    if codesome_key and not _codesome_disabled:
+        try:
+            resp = requests.post(
+                "https://v3.codesome.cn/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {codesome_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "claude-sonnet-4-6",
+                    "max_tokens": 600,
+                    "temperature": 0.3,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            choices = resp.json().get("choices", [])
+            if choices and isinstance(choices[0], dict):
+                content = choices[0].get("message", {}).get("content", "")
+            else:
+                content = ""
+            print(f"  [CodeSome Sonnet OK]", flush=True)
+            return parse_response(content)
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 503:
+                _codesome_disabled = True
+                print(f"  [CodeSome 503 熔断] 本次运行跳过 CodeSome，直接用 MiniMax", flush=True)
+            else:
+                print(f"  [CodeSome Sonnet 失败] {e}", flush=True)
+        except Exception as e:
+            print(f"  [CodeSome Sonnet 失败] {e}", flush=True)
 
     # ── 回退：MiniMax-Text-2.7 ──
     minimax_key = os.environ.get("MINIMAX_API_KEY", "")
@@ -817,6 +854,7 @@ def run_single_profile_pipeline(
             with open(fname, "w", encoding="utf-8") as f:
                 f.write(report)
             print(f"\n日报已保存: {fname}")
+            md_to_pdf(fname)
         else:
             print("\n" + "=" * 60)
             print(report)
@@ -968,7 +1006,7 @@ def main():
             min_score=args.min_score,
             dry_run=args.dry_run,
             output_dir=output_dir,
-            use_cache=args.regenerate,
+            use_cache=args.regenerate or args.force,
             date_str=args.date,
         )
         return
@@ -998,6 +1036,7 @@ def main():
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(report)
             print(f"\n日报已保存: {args.output}")
+            md_to_pdf(args.output)
         else:
             print("\n" + "=" * 60)
             print(report)
