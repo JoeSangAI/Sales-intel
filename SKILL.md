@@ -3,6 +3,7 @@ name: 销售情报助手
 description: 自动搜索品牌/行业动态和融资信号，生成分众传媒销售视角的每日情报简报
 version: 0.2.0
 author: Joe
+project_root: /Users/Joe_1/Desktop/Vibe Working/tools/sales-intel
 trigger:
   - 销售情报
   - 今日情报
@@ -189,12 +190,25 @@ Step 7: 生成完整日报
 
 ## 执行入口
 
+**项目路径**：`/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel`
+
 ```bash
-cd /Users/Joe_1/Desktop/Vibe\ Working/tools/sales-intel && python scripts/main.py --profile 张三
+# 单个档案
+cd "/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel" && python3 scripts/main.py --profile 姓名
+
+# 所有档案（共享搜索池，节省 API）
+cd "/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel" && python3 scripts/main.py --profile-all
+
+# 排除某人，顺序跑其余所有人（动态读取 profiles/ 目录）
+cd "/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel" && \
+  for f in profiles/*.yaml; do \
+    name=$(basename $f .yaml); \
+    [ "$name" != "排除的人" ] && python3 scripts/main.py --profile "$name"; \
+  done
 ```
 
-### 输出规范
-
+**重要：档案目录 `profiles/` 下的 .yaml 文件即为所有档案，新增销售直接加文件即可，无需修改代码。**
+**档案目录**：`/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel/profiles/`
 **报告输出目录**：`/Users/Joe_1/Desktop/AI output/sales intel/`
 
 每人一个文件夹，文件名格式：`{人名}-销售情报-{日期}.md`

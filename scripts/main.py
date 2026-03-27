@@ -583,7 +583,7 @@ def run_pipeline(
     fundraising_results_raw: 可选，预取的融资搜索结果（多档案模式下由主流程统一预取）
     use_cache: 为 True 时，跳过搜索，从存档加载结果重新分析（用于重新生成报告）
     date_str: 可选，指定存档日期（YYYY-MM-DD），默认为当天
-    time_range: 搜索时间窗口，"day"=今日，"year"=一年（首次运行使用）
+    time_range: 搜索时间窗口，"day"=今日，"month"=近3个月（首次运行使用）
     first_run: 是否为首次运行（由 run_single_profile_pipeline 在存档保存前计算后传入）
     """
     if config is None:
@@ -625,7 +625,7 @@ def _run_pipeline_inner(
 
     use_cache: True 时跳过搜索，从 SQLite 存档加载结果重新分析。
     date_str: 存档日期，默认为当天。
-    time_range: 搜索时间窗口，"day"=今日，"year"=一年（首次运行使用）。
+    time_range: 搜索时间窗口，"day"=今日，"month"=近3个月（首次运行使用）。
     first_run: 是否为首次运行（由 run_single_profile_pipeline 在存档保存前计算后传入）。
     """
     brand_configs = config.get("brands", [])
@@ -696,7 +696,7 @@ def _run_pipeline_inner(
             set_last_fundraising_date(datetime.now().date().isoformat())
         else:
             fundraising_results_raw = []
-            fr_label = "否（非周一/周四）"
+            fr_label = "否（非周一/周三）"
             fr_count = 0
 
         print(f"\n[Step 2] 融资专项搜索: {fr_label}")
@@ -833,10 +833,10 @@ def run_single_profile_pipeline(
     # 首次运行判断（必须在 run_pipeline 调用前完成，以便传入 generate_full_report）
     first_run = is_first_run(profile_name) if profile_name and not use_cache else False
 
-    # 首次运行：查过去一年；后续查今日
+    # 首次运行：查近3个月；后续查今日
     if first_run and not use_cache:
-        time_range = "year"
-        print(f"  [首次运行] 扩展时间窗口为一年")
+        time_range = "month"
+        print(f"  [首次运行] 扩展时间窗口为近3个月")
     else:
         time_range = "day"
 
