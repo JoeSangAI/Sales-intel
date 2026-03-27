@@ -44,6 +44,9 @@ def collect_all_queries(profiles: list[dict]) -> list[dict]:
         # 品牌查询
         for brand_cfg in brand_configs:
             for q in build_brand_queries(brand_cfg):
+                # 传递品牌优先级到查询（供 execute_shared_search 决定结果配额）
+                if brand_cfg.get("priority") == "high":
+                    q["priority"] = "high"
                 q_key = f"{q['query']}|{q.get('lang', 'zh')}"
                 if q_key not in seen:
                     seen.add(q_key)
@@ -121,6 +124,9 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
 
         try:
             qtype = q.get("type", "")
+            # 高优先级品牌获得更多结果配额
+            priority = q.get("priority", "normal")
+            max_results = 10 if priority == "high" else 7
             # brand_wechat 查询走今日头条（可获取真实文章URL）
             if qtype == "brand_wechat":
                 results = _search_toutiao(query=q["query"], max_results=5)
@@ -129,9 +135,9 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
                     query=q["query"],
                     api_key=api_key,
                     topic="news",
-                    time_range="week",
+                    time_range="day",
                     search_depth="basic",
-                    max_results=5,
+                    max_results=max_results,
                 )
             formatted = []
             for r in results:

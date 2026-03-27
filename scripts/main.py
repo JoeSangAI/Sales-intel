@@ -116,6 +116,9 @@ from scripts.search_pool import (
     collect_all_queries, execute_shared_search,
     distribute_results, collect_single_profile_queries,
 )
+from scripts.endorsement import (
+    prompt_and_fetch_endorsements, match_endorsements_to_profile,
+)
 
 # CodeSome 503 熔断：一次 503 后整个 session 跳过，避免每条都重试浪费时间
 _codesome_disabled = False
@@ -568,6 +571,7 @@ def run_pipeline(
     date_str: str = None,
     time_range: str = "day",
     first_run: bool = False,
+    endorsement_items: list = None,
 ) -> str:
     """
     执行完整 pipeline
@@ -600,6 +604,7 @@ def run_pipeline(
             date_str=date_str,
             time_range=time_range,
             first_run=first_run,
+            endorsement_items=endorsement_items,
         )
     finally:
         # 恢复默认 profile
@@ -612,6 +617,7 @@ def _run_pipeline_inner(
     fundraising_results_raw=None, use_cache=False, date_str: str = None,
     time_range: str = "day",
     first_run: bool = False,
+    endorsement_items: list = None,
 ) -> str:
     """
     run_pipeline 的核心逻辑（放在 try/finally 外层）。
@@ -759,6 +765,7 @@ def _run_pipeline_inner(
         profile_name=profile_name,
         brand_configs=brand_configs,
         is_first_run=first_run,
+        endorsement_items=endorsement_items or [],
     )
     print(f"  日报生成完成，共 {len(report)} 字符")
 
@@ -794,6 +801,7 @@ def run_single_profile_pipeline(
     fundraising_results_raw: list = None,
     use_cache: bool = False,
     date_str: str = None,
+    endorsement_items: list = None,
 ) -> str:
     """
     运行单个档案的完整 pipeline。
@@ -844,6 +852,7 @@ def run_single_profile_pipeline(
         date_str=date_str,
         time_range=time_range,
         first_run=first_run,
+        endorsement_items=endorsement_items,
     )
 
     if report:
@@ -893,15 +902,20 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
 
     # Phase 1b: 融资专项预取（只查一次，全局共享）
     if is_fundraising_day():
-        print(f"\n[多档案模式] 融资专项搜索（每周一、四）...")
+        print(f"\n[多档案模式] 融资专项搜索（每周一、三）...")
         fr_config = shared_config.get("fundraising", {})
         pre_fr_results = run_fundraising_search(fr_config)
         print(f"  融资搜索结果: {len(pre_fr_results)} 条")
         set_last_fundraising_date(datetime.now().date().isoformat())
     else:
         last_fr_date = get_last_fundraising_date()
-        print(f"\n[多档案模式] 融资专项跳过（上次: {last_fr_date}，距今 < 3 天）")
+        print(f"\n[多档案模式] 融资专项跳过（上次: {last_fr_date}）")
         pre_fr_results = []
+
+    # Phase 1c: 周三代言人速报（交互式，暂停等待用户粘贴微信链接）
+    all_endorsements = []
+    if datetime.now().weekday() == 2:  # 周三
+        all_endorsements = prompt_and_fetch_endorsements(profiles)
 
     # Phase 2: 按档案独立处理
     reports = []
@@ -910,6 +924,9 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
         # 设置数据目录
         set_dedup_profile(pname)
         set_memory_profile(pname)
+
+        # 按行业过滤代言人
+        profile_endorsements = match_endorsements_to_profile(all_endorsements, profile) if all_endorsements else []
 
         output_dir = os.path.join(DEFAULT_AI_OUTPUT_DIR, pname)
         report = run_single_profile_pipeline(
@@ -920,6 +937,7 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
             output_dir=output_dir,
             dry_run=dry_run,
             fundraising_results_raw=pre_fr_results,
+            endorsement_items=profile_endorsements,
         )
         reports.append(report)
 
@@ -1006,7 +1024,7 @@ def main():
             min_score=args.min_score,
             dry_run=args.dry_run,
             output_dir=output_dir,
-            use_cache=args.regenerate or args.force,
+            use_cache=args.regenerate,
             date_str=args.date,
         )
         return

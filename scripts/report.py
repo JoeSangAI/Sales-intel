@@ -223,6 +223,23 @@ def _is_cluster_followup(cluster: list[dict]) -> tuple[bool, str]:
     return True, notes[0] if notes else ""
 
 
+def _get_cluster_date(cluster: list[dict]) -> str:
+    """从簇中取最新的 published_date，格式化为 MM-DD"""
+    dates = []
+    for it in cluster:
+        d = it.get("published_date", "")
+        if d and len(d) >= 10:
+            dates.append(d[:10])
+    if not dates:
+        return ""
+    latest = sorted(dates)[-1]
+    # 只显示 MM-DD
+    parts = latest.split("-")
+    if len(parts) == 3:
+        return f"{parts[1]}-{parts[2]}"
+    return latest
+
+
 def _format_cluster(cluster: list[dict], date_str: str = "") -> list[str]:
     """格式化一个主题簇为 Markdown — 清晰分行版"""
     raw_title = _clean_title(_pick_best_title(cluster))
@@ -278,9 +295,11 @@ def _format_cluster(cluster: list[dict], date_str: str = "") -> list[str]:
             break
 
     lines = []
-    # 标题行：事件类型 · 核心信息
+    # 标题行：事件类型 · 核心信息 · 日期
     type_tag = f"【{event_type}】" if event_type else ""
-    lines.append(f"- {type_tag}**{title}**（{score}/10）")
+    pub_date = _get_cluster_date(cluster)
+    date_tag = f" · {pub_date}" if pub_date else ""
+    lines.append(f"- {type_tag}**{title}**（{score}/10{date_tag}）")
     lines.append("")
     # 核心内容
     if intel_summary:
@@ -537,7 +556,9 @@ def _format_fundraising_cluster(cluster: list[dict], date_str: str = "") -> list
     if brand_label:
         lines.append(f"**{brand_label}**")
         lines.append("")
-    lines.append(f"- {title}（{score}/10{count_str}{date_suffix}）")
+    pub_date = _get_cluster_date(cluster)
+    pub_tag = f" · {pub_date}" if pub_date else ""
+    lines.append(f"- {title}（{score}/10{count_str}{pub_tag}）")
     lines.append("")
     if intel_summary:
         lines.append(f"  {intel_summary}")
@@ -780,6 +801,7 @@ def generate_full_report(
     profile_name: str = None,
     brand_configs: list[dict] = None,
     is_first_run: bool = False,
+    endorsement_items: list[dict] = None,
 ) -> str:
     """
     生成完整日报（整合所有板块）
@@ -887,7 +909,60 @@ def generate_full_report(
             lines.append("")
             lines.append(fr_section)
 
+    # ── 3. 本周代言人速报 ──
+    if endorsement_items:
+        end_section = generate_endorsement_section(endorsement_items, date_str)
+        if end_section:
+            lines.append("")
+            lines.append(end_section)
+
     lines.append("---")
     lines.append(f"*由销售情报助手自动生成 · {date_str}*")
+
+    return "\n".join(lines)
+
+
+def generate_endorsement_section(endorsement_items: list[dict], date_str: str = "") -> str:
+    """
+    生成本周代言人速报板块。
+
+    endorsement_items: [{
+        "brand": "品牌名",
+        "celebrity": "代言人名",
+        "industry": "行业",
+        "detail": "代言详情",
+        "relevance": "与分众的关联分析",
+        "urgency": "🔴/🟡/⚪",
+    }, ...]
+    """
+    if not endorsement_items:
+        return ""
+
+    lines = ["## 🌟 本周代言人速报", ""]
+    lines.append(f"> 本周共 {len(endorsement_items)} 条代言人动态，已按行业匹配")
+    lines.append("")
+
+    by_industry = {}
+    for item in endorsement_items:
+        ind = item.get("industry", "其他")
+        if ind not in by_industry:
+            by_industry[ind] = []
+        by_industry[ind].append(item)
+
+    for industry, items in by_industry.items():
+        lines.append(f"### {industry}")
+        lines.append("")
+        for item in items:
+            brand = item.get("brand", "")
+            celebrity = item.get("celebrity", "")
+            detail = item.get("detail", "")
+            relevance = item.get("relevance", "")
+            urgency = item.get("urgency", "🟡")
+            lines.append(f"- {urgency} **{brand} × {celebrity}**")
+            if detail:
+                lines.append(f"  {detail}")
+            if relevance:
+                lines.append(f"  💡 **分众机会**: {relevance}")
+            lines.append("")
 
     return "\n".join(lines)

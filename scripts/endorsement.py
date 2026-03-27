@@ -453,7 +453,156 @@ def _parse_analysis_response(response_text: str) -> dict:
         return {}
 
 
-def distribute_to_profiles(endorsements: list[dict], profiles: list[dict]) -> dict:
+def collect_all_industries(profiles: list[dict]) -> list[str]:
+    """从所有档案中收集关注的行业列表"""
+    industries = set()
+    for p in profiles:
+        for brand in p.get("brands", []):
+            ind = brand.get("industry", "")
+            if ind:
+                industries.add(ind)
+        for ind_cfg in p.get("industries", []):
+            if isinstance(ind_cfg, dict):
+                industries.add(ind_cfg.get("name", ""))
+            else:
+                industries.add(str(ind_cfg))
+    return sorted(industries)
+
+
+def fetch_wechat_article_via_bocha(url: str) -> str:
+    """用 Bocha web-search API 抓取微信文章内容"""
+    from scripts.search import get_api_key
+    try:
+        api_key = get_api_key()
+        resp = requests.post(
+            "https://api.bochaai.com/v1/web-search",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"query": url, "freshness": "noLimit", "summary": True, "count": 3},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        pages = data.get("data", {}).get("webPages", {}).get("value", [])
+        if pages:
+            parts = []
+            for p in pages:
+                parts.append(f"{p.get('name', '')}\n{p.get('snippet', '')}")
+            return "\n\n".join(parts)
+        return ""
+    except Exception as e:
+        print(f"  [代言人抓取失败] {e}")
+        return ""
+
+
+def parse_endorsements_from_text(article_text: str, all_industries: list[str]) -> list[dict]:
+    """用 MiniMax 从文章中解析代言人信息并匹配行业"""
+    import os as _os
+    minimax_key = _os.environ.get("MINIMAX_API_KEY", "")
+    if not minimax_key:
+        return []
+
+    industries_str = "、".join(all_industries) if all_industries else "3C数码、新能源汽车、AI科技、食品粮油、护肤美妆"
+    prompt = f"""你是分众传媒销售情报分析师。
+
+以下是本周品牌代言人动态的文章内容：
+
+{article_text[:3000]}
+
+请提取所有代言人合作信息，输出 JSON 数组：
+
+[
+  {{
+    "brand": "品牌名",
+    "celebrity": "代言人姓名",
+    "industry": "从以下行业中选最匹配的一个：{industries_str}，都不匹配填「其他」",
+    "detail": "一句话描述代言合作内容",
+    "relevance": "一句话说明分众电梯广告的切入机会",
+    "urgency": "🔴（刚官宣，本周跟进）或 🟡（本月关注）"
+  }}
+]
+
+只输出 JSON 数组，不要其他内容。"""
+
+    try:
+        resp = requests.post(
+            "https://api.minimax.chat/v1/chat/completions",
+            headers={"Authorization": f"Bearer {minimax_key}", "Content-Type": "application/json"},
+            json={
+                "model": "MiniMax-M2.7",
+                "max_tokens": 2000,
+                "temperature": 0.3,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=40,
+        )
+        resp.raise_for_status()
+        content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+        # 过滤 <think> 块
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        start = content.find("[")
+        end = content.rfind("]")
+        if start != -1 and end != -1:
+            return json.loads(content[start:end+1])
+        return []
+    except Exception as e:
+        print(f"  [代言人解析失败] {e}")
+        return []
+
+
+def match_endorsements_to_profile(endorsements: list[dict], profile: dict) -> list[dict]:
+    """将代言人列表过滤出该档案关注的行业"""
+    profile_industries = set()
+    for brand in profile.get("brands", []):
+        ind = brand.get("industry", "")
+        if ind:
+            profile_industries.add(ind)
+    for ind_cfg in profile.get("industries", []):
+        if isinstance(ind_cfg, dict):
+            profile_industries.add(ind_cfg.get("name", ""))
+        else:
+            profile_industries.add(str(ind_cfg))
+    return [e for e in endorsements if e.get("industry", "") in profile_industries]
+
+
+def prompt_and_fetch_endorsements(profiles: list[dict]) -> list[dict]:
+    """
+    周三交互流程：
+    1. 提示用户粘贴微信链接
+    2. 用 Bocha 抓取内容
+    3. 用 MiniMax 解析代言人
+    返回全量代言人列表（未按档案过滤）
+    """
+    # 先检查本周缓存
+    cached = _load_cache()
+    if cached:
+        print(f"  [代言人] 使用本周缓存，共 {len(cached)} 条")
+        return cached
+
+    print("\n" + "="*60)
+    print("📋 今天是周三，需要录入本周代言人信息")
+    print("请粘贴微信文章链接（直接回车跳过）：")
+    print("="*60)
+
+    url = input("> ").strip()
+    if not url:
+        print("  [代言人] 已跳过")
+        return []
+
+    print(f"  [代言人] 正在抓取: {url[:60]}...")
+    article_text = fetch_wechat_article_via_bocha(url)
+    if not article_text:
+        print("  [代言人] 抓取失败，已跳过")
+        return []
+
+    print(f"  [代言人] 抓取成功，正在解析...")
+    all_industries = collect_all_industries(profiles)
+    endorsements = parse_endorsements_from_text(article_text, all_industries)
+    print(f"  [代言人] 解析完成，共 {len(endorsements)} 条")
+
+    if endorsements:
+        _save_cache(endorsements)
+
+    return endorsements
     """
     将代言人信息按行业分配到各销售档案
 

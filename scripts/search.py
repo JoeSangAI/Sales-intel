@@ -126,9 +126,9 @@ def set_last_fundraising_date(date_str: str) -> None:
 
 
 def is_fundraising_day() -> bool:
-    """判断今天是否应该运行融资专项搜索（仅周一和周四）"""
+    """判断今天是否应该运行融资专项搜索（仅周一和周三）"""
     today = datetime.now().weekday()
-    return today in (0, 3)  # 0=周一, 3=周四
+    return today in (0, 2)  # 0=周一, 2=周三
 
 
 def get_api_key() -> str:
@@ -625,48 +625,26 @@ def get_track_keywords(track_name: str) -> list[str]:
 
 
 def _generate_keywords_via_llm(track_name: str) -> list[str]:
-    """调 MiniMax-Text-2.7 生成赛道关键词"""
-    try:
-        import requests
-        minimax_key = os.environ.get("MINIMAX_API_KEY", "")
-        if minimax_key:
-            resp = requests.post(
-                "https://api.minimax.chat/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {minimax_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "MiniMax-Text-2.7",
-                    "max_tokens": 200,
-                    "temperature": 0.3,
-                    "messages": [{
-                        "role": "user",
-                        "content": f"给出「{track_name}」赛道在中国融资新闻中常见的5-8个搜索关键词。\n要求：多样化表达，覆盖不同新闻写法，纯中文，每行一个，不要编号，不要解释。\n示例输出：\n大模型\n生成式AI创业公司\n人工智能应用层公司\nAI独角兽\n大模型厂商\n智能助手应用"
-                    }],
-                },
-                timeout=20,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            choices = data.get("choices", [])
-            content = ""
-            if choices and isinstance(choices[0], dict):
-                content = choices[0].get("message", {}).get("content", "")
-
-            # 解析
-            keywords = []
-            for line in content.strip().split("\n"):
-                line = line.strip().strip("-+*.0123456789. \t")
-                if line and len(line) >= 2:
-                    keywords.append(line)
-            if keywords:
-                print(f"  [关键词生成] {track_name}: {keywords}")
-                return keywords[:8]
-            return []
-    except Exception as e:
-        print(f"  [MiniMax关键词失败] {e}", flush=True)
-        return []
+    """赛道关键词生成 — 使用静态预设表（MiniMax-M2.7 为推理模型，输出不稳定）"""
+    _STATIC_KEYWORDS = {
+        "AI大模型": ["大模型融资", "生成式AI创业公司", "AI独角兽", "大模型厂商", "人工智能应用融资", "AI基础模型", "大模型企业"],
+        "机器人/具身智能": ["人形机器人融资", "具身智能创业", "机器人独角兽", "工业机器人融资", "机器人公司融资", "智能机器人"],
+        "智能硬件/IoT": ["智能硬件融资", "IoT创业公司", "可穿戴设备融资", "智能家居融资", "消费电子融资", "硬件独角兽"],
+        "企业服务/SaaS": ["SaaS融资", "企业服务创业", "B2B软件融资", "企服独角兽", "云服务融资", "数字化转型融资"],
+        "半导体": ["芯片公司融资", "半导体创业", "集成电路融资", "芯片独角兽", "半导体企业融资"],
+        "新能源汽车": ["新能源汽车融资", "电动车创业", "智能汽车融资", "新势力融资", "汽车科技融资"],
+        "消费品": ["新消费融资", "消费品牌融资", "新品牌融资", "消费独角兽", "快消品融资"],
+    }
+    # 精确匹配
+    if track_name in _STATIC_KEYWORDS:
+        return _STATIC_KEYWORDS[track_name]
+    # 模糊匹配
+    for key, kws in _STATIC_KEYWORDS.items():
+        if any(part in track_name for part in key.split("/")) or any(part in key for part in track_name.split("/")):
+            return kws
+    # 兜底：用赛道名本身构造
+    clean = _clean_track_name(track_name)
+    return [f"{clean}融资", f"{clean}创业公司", f"{clean}独角兽", clean]
 
 
 def _clean_track_name(name: str) -> str:

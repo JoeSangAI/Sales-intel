@@ -1,0 +1,59 @@
+[
+  {
+    "brand": "小米汽车",
+    "celebrity": "舒淇",
+    "endorsement_type": "品牌代言人",
+    "industry": "新能源汽车",
+    "relevance_score": 8,
+    "urgency": "🟡",
+    "event_key": "品牌签约明星",
+    "intel_summary": "小米汽车签约舒淇为品牌代言人，新能源汽车赛道竞争加剧，代言人签约后必然启动大规模品牌曝光计划，是分众电梯媒体获取品牌宣传预算的黄金时机。",
+    "prospect_leads": [
+      {
+        "name": "小米汽车",
+        "reason": "刚签品牌代言人舒淇，后续广告投放预算充足，电梯媒体是触达家庭用户和高净值人群的核心场景"
+      }
+    ],
+    "filter": false
+  },
+  {
+    "brand": "小米汽车",
+    "celebrity": "苏炳添",
+    "endorsement_type": "品牌代言人",
+    "industry": "新能源汽车",
+    "relevance_score": 8,
+    "urgency": "🟡",
+    "event_key": "品牌签约明星代言人",
+    "intel_summary": "小米汽车签约苏炳添为品牌代言人，苏炳添的“速度”形象与小米汽车SU7高性能定位高度契合，新能源品牌密集期签约代言人，后续必然启动大规模品牌宣传攻势。",
+    "prospect_leads": [
+      {
+        "name": "小米汽车",
+        "reason": "刚签品牌代言人，必有持续宣传需求；新能源品牌市占率冲刺期，需高频曝光建立认知；苏炳添的国民级形象契合小米汽车破圈需求。"
+      },
+      {
+        "name": "小米集团营销部门",
+        "reason": "集团层面代言人决策往往带动全品类协同传播，可探索小米生态全场景营销方案。"
+      }
+    ],
+    "filter": false
+  },
+  {
+    "brand": "navigare",
+    "celebrity": "张新成",
+    "endorsement_type": "品牌代言人",
+    "industry": "服装",
+    "relevance_score": 7,
+    "urgency": "🟡",
+    "event_key": "品牌签约明星",
+    "intel_summary": "意大利服装品牌navigare签约当红演员张新成为品牌代言人，签约后品牌必将启动大规模宣传攻势，电梯媒体作为核心线下触达场景，是分众获取该客户投放预算的黄金窗口。",
+    "prospect_leads": [
+      {
+        "name": "navigare",
+        "reason": "刚签张新成为品牌代言人，后续新品发布、促销活动等宣传需求旺盛，电梯媒体是触达目标消费者的必经渠道"
+      }
+    ],
+    "filter": false,
+    "name": "navigare",
+    "reason": "刚签代言人，后续宣传需求大"
+  }
+]

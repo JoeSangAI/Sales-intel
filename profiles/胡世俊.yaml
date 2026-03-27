@@ -1,0 +1,524 @@
+name: 胡世俊
+brands:
+- name: 骆驼
+  sub_brands:
+  - 骆驼
+  - CAMEL
+  industry: 户外运动服饰
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  - 冲锋衣
+  competitors:
+  - 北面
+  - 哥伦比亚
+  - 始祖鸟
+  lang: zh
+- name: 伯希和
+  sub_brands:
+  - 伯希和
+  - PELLIOT
+  industry: 户外运动服饰
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 营销
+  - 融资
+  - IPO
+  competitors:
+  - 骆驼
+  - 凯乐石
+  lang: zh
+- name: 凯乐石
+  sub_brands:
+  - 凯乐石
+  - KAILAS
+  industry: 户外运动服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 骆驼
+  - 始祖鸟
+  lang: zh
+- name: 蕉下
+  sub_brands:
+  - 蕉下
+  - BANANA UNDER
+  industry: 户外运动服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 发布会
+  - 营销
+  - 广告
+  - 融资
+  - IPO
+  competitors:
+  - 骆驼
+  - 哥伦比亚
+  lang: zh
+- name: 巴拉巴拉
+  sub_brands:
+  - 巴拉巴拉
+  - Balabala
+  industry: 儿童服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 促销
+  - 融资
+  competitors:
+  - 安踏儿童
+  - 李宁儿童
+  lang: zh
+- name: 安奈儿
+  sub_brands:
+  - 安奈儿
+  - Annil
+  industry: 儿童服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 巴拉巴拉
+  - 戴维贝拉
+  lang: zh
+- name: 珀莱雅
+  sub_brands:
+  - 珀莱雅
+  - PROYA
+  industry: 美妆护肤
+  keywords:
+  - 新品
+  - 代言人
+  - 发布会
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 薇诺娜
+  - 自然堂
+  - 韩束
+  lang: zh
+- name: 薇诺娜
+  sub_brands:
+  - 薇诺娜
+  - WINONA
+  industry: 美妆护肤
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 珀莱雅
+  - 可复美
+  lang: zh
+- name: 花西子
+  sub_brands:
+  - 花西子
+  - Florasis
+  industry: 美妆护肤
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  - 品牌升级
+  competitors:
+  - 毛戈平
+  - 彩棠
+  lang: zh
+- name: 韩束
+  sub_brands:
+  - 韩束
+  - KANS
+  - 一叶子
+  industry: 美妆护肤
+  keywords:
+  - 新品
+  - 代言人
+  - 短剧
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 珀莱雅
+  - 自然堂
+  lang: zh
+- name: 太平鸟
+  sub_brands:
+  - 太平鸟
+  - PEACEBIRD
+  industry: 女性服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 联名
+  - 融资
+  competitors:
+  - UR
+  - 江南布衣
+  lang: zh
+- name: 江南布衣
+  sub_brands:
+  - 江南布衣
+  - JNBY
+  industry: 女性服饰
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 太平鸟
+  - 伊芙丽
+  lang: zh
+- name: 山下有松
+  sub_brands:
+  - 山下有松
+  - Songmont
+  industry: 轻奢包包
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  - 联名
+  competitors:
+  - 古良吉吉
+  - 裘真
+  lang: zh
+- name: 绿米Aqara
+  sub_brands:
+  - 绿米
+  - Aqara
+  industry: 智能家居
+  keywords:
+  - 新品
+  - 发布会
+  - 营销
+  - 广告
+  - 融资
+  - 上市
+  competitors:
+  - 华为全屋智能
+  - 萤石
+  lang: zh
+- name: 雷鸟创新
+  sub_brands:
+  - 雷鸟
+  - 雷鸟创新
+  industry: 智能眼镜
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - XREAL
+  - Rokid
+  lang: zh
+- name: 乖宝宠物
+  sub_brands:
+  - 乖宝
+  - Gambol
+  industry: 宠物经济
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  - 上市
+  competitors:
+  - 中宠股份
+  - 天元宠物
+  lang: zh
+- name: 香飘飘
+  sub_brands:
+  - 香飘飘
+  industry: 食品饮料
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 奈雪
+  - 喜茶
+  lang: zh
+- name: 三顿半
+  sub_brands:
+  - 三顿半
+  industry: 食品饮料
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 永璞
+  - 时萃
+  lang: zh
+- name: 蓝月亮
+  sub_brands:
+  - 蓝月亮
+  industry: 日用洗护
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 立白
+  - 纳爱斯
+  lang: zh
+- name: 上海家化
+  sub_brands:
+  - 上海家化
+  - 六神
+  - 佰草集
+  - 美加净
+  industry: 日用洗护
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 蓝月亮
+  - 立白
+  lang: zh
+- name: 新东方
+  sub_brands:
+  - 新东方
+  - 东方甄选
+  industry: 教育
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 新业务
+  competitors:
+  - 好未来
+  - 猿辅导
+  lang: zh
+- name: 猿辅导
+  sub_brands:
+  - 猿辅导
+  - 小猿搜题
+  industry: 教育
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 作业帮
+  - 新东方
+  lang: zh
+- name: 三只松鼠
+  sub_brands:
+  - 三只松鼠
+  industry: 休闲食品
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 良品铺子
+  - 洽洽
+  lang: zh
+- name: 良品铺子
+  sub_brands:
+  - 良品铺子
+  industry: 休闲食品
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 品牌升级
+  competitors:
+  - 三只松鼠
+  - 卫龙
+  lang: zh
+- name: SHEIN
+  sub_brands:
+  - SHEIN
+  - 希音
+  industry: 跨境电商
+  keywords:
+  - 融资
+  - IPO
+  - 上市
+  - 营销
+  - 广告
+  - 品牌升级
+  competitors:
+  - Temu
+  - 速卖通
+  lang: zh
+- name: Temu
+  sub_brands:
+  - Temu
+  - 拼多多跨境
+  industry: 跨境电商
+  keywords:
+  - 融资
+  - 营销
+  - 广告
+  - 品牌升级
+  - 新市场
+  competitors:
+  - SHEIN
+  - 速卖通
+  lang: zh
+- name: 云南白药
+  sub_brands:
+  - 云南白药
+  industry: 医药大健康
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 同仁堂
+  - 片仔癀
+  lang: zh
+- name: 同仁堂
+  sub_brands:
+  - 同仁堂
+  industry: 医药大健康
+  keywords:
+  - 新品
+  - 代言人
+  - 营销
+  - 广告
+  - 品牌升级
+  competitors:
+  - 云南白药
+  - 太极集团
+  lang: zh
+- name: 影石Insta360
+  sub_brands:
+  - 影石
+  - Insta360
+  industry: 数码影像
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 大疆
+  - GoPro
+  lang:
+  - zh
+  - en
+- name: 大疆
+  sub_brands:
+  - 大疆
+  - DJI
+  industry: 数码影像
+  keywords:
+  - 新品
+  - 发布会
+  - 代言人
+  - 营销
+  - 广告
+  - 融资
+  competitors:
+  - 影石
+  - GoPro
+  lang:
+  - zh
+  - en
+industries:
+- name: 户外运动服饰
+  keywords:
+  - 户外服装 融资 亿元 2026
+  - 冲锋衣 代言人 新品 发布
+  - 国产户外品牌 品牌升级 营销
+  - 户外运动 品牌 广告 投放
+  analysis_perspective: 户外赛道国产品牌崛起，融资后有强烈的大众破圈需求，分众社区+写字楼双场景是否匹配目标人群？
+- name: 美妆护肤
+  keywords:
+  - 国货美妆 融资 亿元 2026
+  - 护肤品 代言人 官宣 新品
+  - 彩妆 品牌升级 营销 广告
+  - 美妆 功效 破圈 市场动作
+  analysis_perspective: 国货美妆高速增长，融资后品牌有强烈的大众认知建立需求，分众电梯场景能否有效触达白领女性决策群体？
+- name: 智能家居
+  keywords:
+  - 智能家居 融资 亿元 2026
+  - 智能锁 智能眼镜 新品 发布
+  - AI眼镜 AR眼镜 代言人 营销
+  - 智能硬件 品牌升级 广告 投放
+  analysis_perspective: 智能家居从功能型向生活方式升级，新品发布密集，分众写字楼场景能否触达科技早期采用者？
+- name: 宠物经济
+  keywords:
+  - 宠物食品 融资 亿元 2026
+  - 宠物品牌 代言人 营销 广告
+  - 宠物保健品 新品 上市 发布
+  - 宠物经济 品牌升级 市场动作
+  analysis_perspective: 宠物经济高增长赛道，品牌正从淘品牌向大众品牌升级，分众社区场景覆盖养宠家庭效率如何？
+- name: 食品饮料
+  keywords:
+  - 速溶咖啡 代言人 新品 发布 2026
+  - 休闲食品 融资 亿元 品牌升级
+  - 代餐食品 营销 广告 破圈
+  - 食品饮料 品牌 广告 投放 2026
+  analysis_perspective: 食品饮料品牌广告预算大，分众的封闭空间能否在消费者决策链中建立品牌心智？
+fundraising:
+  tracks:
+  - name: 美妆护肤
+    priority: 9
+    reason: 功效护肤赛道持续火热，融资后品牌有强烈的大众破圈需求
+  - name: 户外运动服饰
+    priority: 8
+    reason: 国产户外品牌高速增长，融资后品牌有大众破圈需求
+  - name: 智能硬件/IoT
+    priority: 8
+    reason: AI眼镜/智能家居新品密集，融资后营销需求强
+  - name: 宠物经济
+    priority: 7
+    reason: 宠物品牌从淘品牌向大众品牌升级，分众场景匹配度高
+  - name: 食品饮料
+    priority: 7
+    reason: 食品饮料预算大，融资后有强烈的品牌声量需求
