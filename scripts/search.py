@@ -95,8 +95,12 @@ def _get_bocha_key() -> str:
 
 
 def is_weekly_industry_day() -> bool:
-    """判断今天是否为行业搜索日（周一、周四）"""
-    return datetime.now().weekday() in (0, 3)
+    """判断今天是否为行业搜索日（周一、周三,周六严格排除）"""
+    weekday = datetime.now().weekday()
+    # 周六(5)严格排除行业新闻
+    if weekday == 5:
+        return False
+    return weekday in (0, 2)  # 周一、周三
 
 
 # ── 融资频率控制（每 3 天）───────────────────────────────────
@@ -126,9 +130,12 @@ def set_last_fundraising_date(date_str: str) -> None:
 
 
 def is_fundraising_day() -> bool:
-    """判断今天是否应该运行融资专项搜索（仅周一和周三）"""
-    today = datetime.now().weekday()
-    return today in (0, 2)  # 0=周一, 2=周三
+    """判断今天是否应该运行融资专项搜索（仅周一和周三,周六严格排除）"""
+    weekday = datetime.now().weekday()
+    # 周六(5)严格排除融资新闻
+    if weekday == 5:
+        return False
+    return weekday in (0, 2)  # 0=周一, 2=周三
 
 
 def get_api_key() -> str:
@@ -147,6 +154,10 @@ def _search_bocha(
     max_results: int = 5,
 ) -> list[dict]:
     """调用 Bocha API 搜索"""
+    # 强制在查询中添加 2026,确保返回最新新闻
+    if "2026" not in query:
+        query = f"{query} 2026"
+
     freshness_map = {
         "day": "oneDay",
         "week": "oneWeek",

@@ -18,7 +18,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 # 默认输出基础目录（可通过环境变量 AI_OUTPUT_DIR 覆盖）
-DEFAULT_AI_OUTPUT_DIR = os.getenv("AI_OUTPUT_DIR", "/Users/Joe_1/Desktop/AI output/sales intel")
+DEFAULT_AI_OUTPUT_DIR = os.getenv("AI_OUTPUT_DIR", "/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel/output")
 
 # 加载 .env（如果存在）
 def _load_dotenv():

@@ -185,20 +185,19 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
     """
     将搜索池结果分发给指定档案。
 
-    逻辑：保留所有结果，但只分发该档案关心的品牌/赛道。
-    每个结果的 brand/track_name 标签保持不变（由搜索时的 profile 决定）。
+    逻辑：严格匹配品牌归属,只分发该档案 profile 中明确注册的品牌。
     """
     results = []
     profile_name = profile.get("name", "default")
 
-    for q_key, items in pool.items():
-        # 检查这个 query 是否是这个 profile 需要的
-        # 需要从原始 query 重建来判断
-        query_str = q_key.split("|")[0]
+    # 构建该 profile 的所有品牌名称集合(包括 sub_brands)
+    profile_brands = set()
+    for brand_cfg in profile.get("brands", []):
+        profile_brands.add(brand_cfg.get("name", "").lower())
+        for sub in brand_cfg.get("sub_brands", []):
+            profile_brands.add(sub.lower())
 
-        # 简单判断：profile 关心哪些品牌/赛道
-        # 只要有结果就分发（因为 profile 已经在 collect 阶段标记了 _profiles_needing）
-        # 实际按 brand_names 过滤更精准
+    for q_key, items in pool.items():
         for item in items:
             brand = item.get("brand", "")
             track = item.get("track_name", "")
@@ -212,19 +211,18 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
                         results.append(item)
                 continue
 
-            # 品牌结果：按品牌名过滤
-            brand_names_in_profile = [b.get("name", "") for b in profile.get("brands", [])]
-            # 判断 item 的 brand 是否在 profile 关注范围内
-            # 品牌查询结果的 brand 就是查询时的品牌，匹配即可
-            item_brand = brand
-            if item_brand.startswith("[行业]"):
-                # 行业结果
+            # 行业结果：按行业名过滤
+            if brand.startswith("[行业]"):
                 industry_configs = profile.get("industries", [])
                 ind_names = [i.get("name", "") for i in industry_configs]
-                ind_tag = item_brand.replace("[行业]", "")
+                ind_tag = brand.replace("[行业]", "")
                 if ind_names and ind_tag in ind_names:
                     results.append(item)
-            elif any(b in item_brand or item_brand in b for b in brand_names_in_profile):
+                continue
+
+            # 品牌结果：严格匹配,只有 profile 中注册的品牌才分发
+            item_brand_lower = brand.lower()
+            if item_brand_lower in profile_brands:
                 results.append(item)
 
     return results
