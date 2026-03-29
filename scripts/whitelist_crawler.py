@@ -173,14 +173,19 @@ def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None) -> List[
     print("白名单网站直接抓取 v2")
     print("="*60 + "\n")
 
-    # 构建行业关键词
+    # 构建行业关键词（从industries配置中提取）
     industry_keywords = {}
-    if config.get("industry_research"):
-        for industry_config in config["industry_research"]:
+    if config.get("industries"):
+        for industry_config in config["industries"]:
             industry_name = industry_config.get("name", "")
             keywords = industry_config.get("keywords", [])
             if industry_name and keywords:
-                industry_keywords[industry_name] = keywords
+                # 将关键词字符串拆分成单个关键词
+                all_keywords = []
+                for kw_str in keywords:
+                    # 按空格拆分，提取单个关键词
+                    all_keywords.extend(kw_str.split())
+                industry_keywords[industry_name] = all_keywords
 
     # 品牌关键词
     brand_keywords = profile_brands or []
