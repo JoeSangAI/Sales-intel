@@ -100,6 +100,7 @@ from scripts.search import (
     record_source_hits, is_weekly_industry_day,
     is_fundraising_day, set_last_fundraising_date, get_last_fundraising_date,
     is_first_run,
+    run_hybrid_search,
 )
 from scripts.dedup import deduplicate, set_profile as set_dedup_profile, get_profile as get_dedup_profile
 from scripts.analyzer import (
@@ -675,15 +676,21 @@ def _run_pipeline_inner(
         })
         print(f"  分发结果: {len(all_raw)} 条")
     else:
-        # 独立搜索
-        print("\n[Step 1] 品牌搜索...")
-        raw_results = run_search(
-            brand_configs=brand_configs,
-            industry_configs=industry_configs,
-            include_industry=include_industry,
-            time_range=time_range,
-        )
-        print(f"  品牌+行业搜索结果: {len(raw_results)} 条")
+        # 独立搜索 - 使用混合搜索模式
+        print("\n[Step 1] 混合搜索（Bocha + 白名单直接抓取）...")
+
+        # 品牌搜索：使用混合模式
+        brand_results = run_hybrid_search(brand_configs, config)
+
+        # 行业搜索：保持原有逻辑
+        if include_industry:
+            from scripts.search import run_industry_search
+            industry_results = run_industry_search(industry_configs)
+            raw_results = brand_results + industry_results
+        else:
+            raw_results = brand_results
+
+        print(f"  混合搜索结果: {len(raw_results)} 条")
 
         # 融资专项搜索：优先使用预取结果（多档案模式统一预取），否则按需运行
         if fundraising_results_raw is not None:
@@ -962,8 +969,15 @@ def main():
     parser.add_argument("--force", action="store_true", help="强制忽略去重记录，重新推送（用于测试）")
     parser.add_argument("--regenerate", action="store_true", help="从存档加载结果重新生成报告（不重新搜索）")
     parser.add_argument("--date", type=str, default=None, help="指定存档日期（YYYY-MM-DD，默认今天）")
+    parser.add_argument("--analyze-domains", action="store_true", help="运行域名质量分析（分析过去7天搜索结果，生成白名单更新建议）")
 
     args = parser.parse_args()
+
+    # ── 域名质量分析 ──────────────────────────────────────
+    if args.analyze_domains:
+        from scripts.domain_analyzer import run_analysis
+        run_analysis(days=7)
+        return
 
     # ── 去重重置 ──────────────────────────────────────────
     if args.reset_dedup:

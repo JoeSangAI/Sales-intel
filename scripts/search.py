@@ -369,8 +369,8 @@ def build_industry_queries(industry_config: dict) -> list[dict]:
     return queries
 
 
-# 中文新闻源域名白名单（提高中文搜索质量）
-ZH_NEWS_DOMAINS = [
+# 静态白名单（基础媒体）
+_STATIC_NEWS_DOMAINS = [
     # 一线财经/科技媒体
     "36kr.com", "jiemian.com", "thepaper.cn", "sina.com.cn",
     "163.com", "qq.com", "sohu.com", "ifeng.com",
@@ -389,6 +389,26 @@ ZH_NEWS_DOMAINS = [
     # 科技/消费
     "guancha.cn", "pingwest.com", "jiqizhixin.com",
 ]
+
+def _load_dynamic_whitelist() -> list[str]:
+    """加载动态白名单（从domain_whitelist.json）"""
+    whitelist_path = os.path.join(os.path.dirname(__file__), "..", "data", "domain_whitelist.json")
+    if not os.path.exists(whitelist_path):
+        return []
+    try:
+        with open(whitelist_path, "r", encoding="utf-8") as f:
+            whitelist_data = json.load(f)
+            # 合并所有行业的域名
+            all_domains = []
+            for industry, domains in whitelist_data.items():
+                all_domains.extend(domains)
+            return list(set(all_domains))  # 去重
+    except Exception as e:
+        print(f"  [警告] 加载动态白名单失败: {e}")
+        return []
+
+# 中文新闻源域名白名单（静态 + 动态）
+ZH_NEWS_DOMAINS = _STATIC_NEWS_DOMAINS + _load_dynamic_whitelist()
 
 # 融资新闻专用域名白名单（比品牌白名单更宽，包含创投媒体）
 ZH_FUNDRAISING_DOMAINS = ZH_NEWS_DOMAINS + [
@@ -430,15 +450,9 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
     """执行单条查询，过滤噪音 URL，格式化结果（带 5 分钟缓存）"""
     qtype = q.get("type", "")
 
-    # 域名限制：融资搜索用融资专用白名单，行业搜索不限制但后续由 _is_noise_url 过滤
-    if qtype in ("industry",):
-        include_domains = None
-    elif qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
-        include_domains = None  # Bocha 不支持 include_domains，由后处理过滤
-    elif q.get("lang") == "zh":
-        include_domains = ZH_NEWS_DOMAINS
-    else:
-        include_domains = None
+    # 移除域名白名单限制，改用后续的LLM内容评估
+    # 只保留噪音URL过滤（列表页、百科等明显的垃圾）
+    include_domains = None
 
     # 缓存查询（以 query 字符串为 key）
     cache_key = q["query"]
@@ -761,6 +775,63 @@ def run_track_research(tracks: list[dict], include_tracks: list[str], api_key: s
             all_results.extend(future.result())
 
     return all_results
+
+
+def run_hybrid_search(brands: list[dict], config: dict, api_key: str = None) -> list[dict]:
+    """
+    混合搜索：Bocha搜索 + 白名单网站直接抓取
+
+    brands: 品牌配置列表
+    config: 完整配置（包含行业关键词等）
+    """
+    print("\n" + "="*60)
+    print("混合搜索模式")
+    print("="*60 + "\n")
+
+    # 来源1: Bocha搜索（只搜品牌，不包含行业）
+    print("  [来源1] Bocha搜索...")
+    bocha_results = run_search(
+        brand_configs=brands,
+        industry_configs=None,
+        include_industry=False,
+        api_key=api_key,
+        time_range="day"
+    )
+    print(f"    Bocha结果: {len(bocha_results)} 条")
+
+    # 来源2: 白名单网站直接抓取
+    print("\n  [来源2] 白名单网站直接抓取...")
+    try:
+        from scripts.whitelist_crawler import run_whitelist_crawl
+
+        # 提取品牌名称列表
+        brand_names = []
+        for brand in brands:
+            brand_names.append(brand["name"])
+            brand_names.extend(brand.get("sub_brands", []))
+
+        whitelist_results = run_whitelist_crawl(config, brand_names)
+        print(f"    白名单抓取结果: {len(whitelist_results)} 条")
+    except Exception as e:
+        print(f"    白名单抓取失败: {e}")
+        whitelist_results = []
+
+    # 合并去重
+    print("\n  [合并] 去重合并结果...")
+    all_results = bocha_results + whitelist_results
+    unique_results = []
+    seen_urls = set()
+
+    for result in all_results:
+        url = result.get("url", "")
+        if url and url not in seen_urls:
+            seen_urls.add(url)
+            unique_results.append(result)
+
+    print(f"    合并后: {len(unique_results)} 条（去重 {len(all_results) - len(unique_results)} 条）")
+    print("="*60 + "\n")
+
+    return unique_results
 
 
 # ── 信息源质量追踪 ────────────────────────────────────────
