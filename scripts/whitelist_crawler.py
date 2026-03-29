@@ -197,14 +197,84 @@ def crawl_all_whitelist_sources(industry_keywords: Dict[str, List[str]] = None,
     return all_articles
 
 
+def crawl_dynamic_whitelist(whitelist_path: str, keywords: List[str] = None) -> List[Dict]:
+    """
+    使用通用策略抓取domain_whitelist.json中的所有域名
+    """
+    if not os.path.exists(whitelist_path):
+        return []
+
+    try:
+        with open(whitelist_path, "r", encoding="utf-8") as f:
+            whitelist_data = json.load(f)
+    except Exception:
+        return []
+
+    all_articles = []
+
+    # 合并所有行业的域名
+    all_domains = []
+    for industry, domains in whitelist_data.items():
+        all_domains.extend(domains)
+
+    print(f"  [动态白名单] 尝试抓取 {len(all_domains)} 个域名...")
+
+    for domain in all_domains:
+        # 跳过已在WHITELIST_SOURCES中配置的
+        if domain in WHITELIST_SOURCES:
+            continue
+
+        # 尝试常见的URL模式
+        possible_urls = [
+            f"https://{domain}",
+            f"https://www.{domain}",
+        ]
+
+        for base_url in possible_urls:
+            html = _fetch_page_content(base_url, timeout=5)
+            if html:
+                # 尝试多种文章URL模式
+                patterns = [
+                    r'/news/\d+',
+                    r'/article/\d+',
+                    r'/content/\d+',
+                    r'/\d+\.html',
+                    r'/news/.*\.html',
+                    r'/article/.*\.html',
+                ]
+
+                for pattern in patterns:
+                    articles = _extract_articles_from_homepage(html, base_url, pattern)
+
+                    if articles:
+                        # 关键词过滤
+                        if keywords:
+                            filtered = []
+                            for article in articles:
+                                title_lower = article["title"].lower()
+                                if any(kw.lower() in title_lower for kw in keywords):
+                                    filtered.append(article)
+                            articles = filtered
+
+                        if articles:
+                            print(f"    {domain}: {len(articles)} 篇")
+                            all_articles.extend(articles)
+                            break  # 找到有效模式就停止
+
+                if articles:
+                    break  # 找到有效URL就停止
+
+    return all_articles
+
+
 def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None) -> List[Dict]:
     """
-    运行完整的白名单抓取流程（仅抓取重点垂类媒体）
+    运行完整的白名单抓取流程
     config: 用户配置（包含行业关键词等）
     profile_brands: 用户关注的品牌列表
     """
     print("\n" + "="*60)
-    print("白名单网站直接抓取 v3")
+    print("白名单网站直接抓取 v3 - 通用+重点组合")
     print("="*60 + "\n")
 
     # 构建行业关键词（从industries配置中提取）
@@ -226,21 +296,34 @@ def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None) -> List[
     brand_keywords = profile_brands or []
     print(f"  [品牌关键词] {len(brand_keywords)}个品牌")
 
-    # 只抓取配置的重点网站
-    print("\n  [抓取] 重点垂类媒体...")
-    articles = crawl_all_whitelist_sources(industry_keywords, brand_keywords)
+    # 合并所有关键词
+    all_keywords = brand_keywords.copy()
+    for kws in industry_keywords.values():
+        all_keywords.extend(kws)
 
-    # 去重
+    # 阶段1: 抓取重点垂类媒体（已优化）
+    print("\n  [阶段1] 重点垂类媒体（专门优化）...")
+    articles_1 = crawl_all_whitelist_sources(industry_keywords, brand_keywords)
+
+    # 阶段2: 抓取动态白名单（通用策略）
+    print("\n  [阶段2] 动态白名单（通用策略）...")
+    whitelist_path = os.path.join(os.path.dirname(__file__), "..", "data", "domain_whitelist.json")
+    articles_2 = crawl_dynamic_whitelist(whitelist_path, all_keywords)
+
+    # 合并去重
+    all_articles = articles_1 + articles_2
     unique_articles = []
     seen_urls = set()
 
-    for article in articles:
+    for article in all_articles:
         url = article.get("url", "")
         if url and url not in seen_urls:
             seen_urls.add(url)
             unique_articles.append(article)
 
     print(f"\n  [完成] 共抓取 {len(unique_articles)} 篇文章")
+    print(f"    - 重点网站: {len(articles_1)} 篇")
+    print(f"    - 动态白名单: {len(articles_2)} 篇")
     print("="*60 + "\n")
 
     return unique_articles
