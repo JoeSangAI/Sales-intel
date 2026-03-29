@@ -17,30 +17,9 @@ import warnings
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 
-# 高质量垂类媒体配置（基于实际URL结构）
-WHITELIST_SOURCES = {
-    "jumeili.cn": {
-        "name": "聚美丽",
-        "base_url": "https://www.jumeili.cn",
-        "list_url": "https://www.jumeili.cn",
-        "article_pattern": r'/news/view/\d+\.html',
-        "industry": "美妆",
-    },
-    "pinguan.com": {
-        "name": "品观网",
-        "base_url": "https://www.pinguan.com",
-        "list_url": "https://www.pinguan.com",
-        "article_pattern": r'/article/content/\d+',
-        "industry": "美妆",
-    },
-    "c2cc.cn": {
-        "name": "C2CC传媒",
-        "base_url": "https://www.c2cc.cn",
-        "list_url": "https://www.c2cc.cn",
-        "article_pattern": r'/news/\d+\.html',
-        "industry": "美妆",
-    },
-}
+# 重点网站配置（预留，暂不使用）
+# 采用完全通用策略，所有域名都从动态白名单抓取
+WHITELIST_SOURCES = {}
 
 
 def _fetch_page_content(url: str, timeout: int = 10) -> Optional[str]:
