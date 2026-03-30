@@ -11,6 +11,8 @@ import argparse
 import subprocess
 import tempfile
 import concurrent.futures
+import re
+import requests
 from datetime import datetime
 
 # 添加项目根目录到 path
@@ -18,7 +20,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 # 默认输出基础目录（可通过环境变量 AI_OUTPUT_DIR 覆盖）
-DEFAULT_AI_OUTPUT_DIR = os.getenv("AI_OUTPUT_DIR", "/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel/output")
+DEFAULT_AI_OUTPUT_DIR = os.getenv("AI_OUTPUT_DIR", "/Users/Joe_1/Desktop/AI output/sales-intel")
 
 # 加载 .env（如果存在）
 def _load_dotenv():
@@ -261,7 +263,6 @@ def _call_llm_api(prompt: str, parse_response, retries: int = 2):
     优先级：CodeSome (Sonnet) > MiniMax > fallback
     parse_response: 接收原始文本，返回解析后的结果。
     """
-    import requests
     global _codesome_disabled
 
     # ── 优先使用 CodeSome API (Claude Sonnet) ──
@@ -347,7 +348,6 @@ def _call_openclaw_model(prompt: str, retries: int = 2) -> dict:
 
 def _call_minimax(prompt: str, parse_response, retries: int = 2):
     """直接调用 MiniMax-Text-2.7（融资分析专用，不走 Sonnet）"""
-    import requests
     minimax_key = os.environ.get("MINIMAX_API_KEY", "")
     if not minimax_key:
         return parse_response("")
@@ -439,7 +439,6 @@ def _fallback_analysis(result: dict) -> dict:
     if brand_in_title:
         # 检查标题中是否有其他更突出的品牌/主体
         # 模式："联合X""携手X""与X合作" 等 — 品牌出现在介词/动词宾语位置，不是主体
-        import re
         peripheral_patterns = [
             rf'联合{re.escape(matched_brand)}',
             rf'携手{re.escape(matched_brand)}',

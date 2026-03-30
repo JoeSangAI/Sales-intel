@@ -106,7 +106,6 @@ def _cluster_items(items: list[dict]) -> list[list[dict]]:
 
 def _clean_title(title: str) -> str:
     """清理标题中的网站名后缀和噪音"""
-    import re
     # 第一遍：反复去掉末尾的 |xxx / _xxx / -xxx / —xxx 后缀（网站名、栏目名）
     for _ in range(5):
         cleaned = re.sub(r'\s*[|_\-—–·]\s*[^|_\-—–·]{1,20}$', '', title)
@@ -264,7 +263,6 @@ def _format_cluster(cluster: list[dict], date_str: str = "") -> list[str]:
     # 标题为空时，用 intel_summary 第一句话
     title = raw_title
     if not title and intel_summary:
-        import re
         first_sentence = re.split(r'[，。；！？,;!?]', intel_summary)[0]
         title = first_sentence if len(first_sentence) >= 8 else intel_summary[:50]
     if not title:
@@ -521,7 +519,6 @@ def _format_fundraising_cluster(cluster: list[dict], date_str: str = "") -> list
     # 标题为空时，用 intel_summary 第一句话
     title = raw_title
     if not title and intel_summary:
-        import re
         first_sentence = re.split(r'[，。；！？,;!?]', intel_summary)[0]
         title = first_sentence if len(first_sentence) >= 8 else intel_summary[:50]
     if not title:
@@ -638,6 +635,28 @@ def _cluster_fundraising_items(items: list[dict]) -> list[list[dict]]:
 
 
 
+def _normalize_company(name: str) -> str:
+    """归一化公司名，用于去重比较"""
+    if not name:
+        return ""
+    # 提取括号内的品牌名(通常是核心品牌)
+    bracket_match = re.search(r'[（(]([^）)]+)[）)]', name)
+    if bracket_match:
+        brand_name = bracket_match.group(1)
+        # 如果括号内是品牌名,优先使用
+        if len(brand_name) >= 2 and not any(x in brand_name for x in ['有限', '股份', '公司']):
+            return brand_name.strip()
+    # 去掉公司类型后缀
+    name = re.sub(r'(股份)?有限公司$', '', name)
+    name = re.sub(r'集团$', '', name)
+    # 去掉地区前缀
+    name = re.sub(r'^(深圳|北京|上海|广州|杭州|成都|武汉)', '', name)
+    # 去掉常见后缀
+    for suffix in ["机器人", "科技", "智能", "网络", "数字", "系统"]:
+        if name.endswith(suffix) and len(name) > len(suffix) + 2:
+            name = name[:-len(suffix)]
+    return name.strip()
+
 
 def generate_fundraising_section(fundraising_results: list[dict], date_str: str) -> str:
     """生成融资速报板块"""
@@ -649,17 +668,6 @@ def generate_fundraising_section(fundraising_results: list[dict], date_str: str)
     # ── 第一步：按公司名去重，避免同一公司出现在多个赛道 ──
     # 每个公司只保留一条（取紧迫度最高的）
     # 公司名归一化：去掉"机器人"等后缀，避免同一公司不同命名被当作不同公司
-    def _normalize_company(name: str) -> str:
-        """归一化公司名，用于去重比较"""
-        if not name:
-            return ""
-        import re
-        # 去掉常见后缀
-        for suffix in ["机器人", "科技", "智能", "网络", "数字", "系统"]:
-            if name.endswith(suffix) and len(name) > len(suffix) + 2:
-                name = name[:-len(suffix)]
-        return name.strip()
-
     seen_companies = {}  # normalized_name -> (original_name, best_item)
     for item in fundraising_results:
         company = _get_fundraising_company(item)

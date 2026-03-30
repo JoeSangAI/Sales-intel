@@ -8,6 +8,8 @@ AI 分析层
 - 行业洞察生成：对高价值赛道进行深度分析（可调用搜索获取最新案例）
 """
 
+import re
+
 
 ANALYSIS_PROMPT = """你是分众传媒的情报官，专门为销售团队提炼有价值的商机信息。
 
@@ -437,7 +439,6 @@ def generate_industry_insight(
 
     # 如果 prompt 中声明需要搜索，先搜索再补充
     if call_search_fn and "[需要搜索：" in prompt:
-        import re
         search_matches = re.findall(r'\[需要搜索：(.*?)\]', prompt)
         for keywords in search_matches:
             keyword_list = [k.strip() for k in keywords.split("|")]
