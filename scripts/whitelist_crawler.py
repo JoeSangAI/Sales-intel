@@ -124,6 +124,16 @@ WHITELIST_SOURCES = {
         "rss": None,
     },
 
+    # ===== 智能硬件 / IoT =====
+    "iotworld.com.cn": {
+        "name": "IoT世界网",
+        "base_url": "https://www.iotworld.com.cn",
+        "list_url": "https://www.iotworld.com.cn",
+        "article_pattern": r'/html/News/\d+/\w+\.shtml',
+        "industry": "智能硬件",
+        "rss": None,
+    },
+
     # ===== 半导体 =====
     "big-bit.com": {
         "name": "大比特网",
