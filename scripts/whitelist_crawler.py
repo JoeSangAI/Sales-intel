@@ -23,58 +23,9 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 # ── 重点垂类媒体精确配置 ──────────────────────────────
 # domain -> {name, base_url, list_url, article_pattern, industry, rss}
 # 这些网站走首页抓取路线，有精确的 article URL pattern
-# rss 字段：如果有官方 RSS _feed，则优先使用 RSS 抓取
+# rss 字段：如果有官方 RSS feed，则优先使用 RSS 抓取
+# 只保留经过验证确实能抓到的媒体
 WHITELIST_SOURCES = {
-    # ===== 科技媒体 =====
-    "tmtpost.com": {
-        "name": "钛媒体",
-        "base_url": "https://www.tmtpost.com",
-        "list_url": "https://www.tmtpost.com",
-        "article_pattern": r'/[\w-]+/\d+\.html',
-        "industry": "科技",
-        "rss": "https://www.tmtpost.com/rss/",
-    },
-    "donews.com": {
-        "name": "DoNews",
-        "base_url": "https://www.donews.com",
-        "list_url": "https://www.donews.com",
-        "article_pattern": r'/news/\d+',
-        "industry": "科技",
-        "rss": None,
-    },
-    "eeo.com.cn": {
-        "name": "经济观察报",
-        "base_url": "https://www.eeo.com.cn",
-        "list_url": "https://www.eeo.com.cn",
-        "article_pattern": r'/[\w/]+/\d+\.shtml',
-        "industry": "财经",
-        "rss": None,
-    },
-    "cs.com.cn": {
-        "name": "中证网",
-        "base_url": "https://www.cs.com.cn",
-        "list_url": "https://www.cs.com.cn",
-        "article_pattern": r'/[\w/]+\.s?html?',
-        "industry": "财经",
-        "rss": None,
-    },
-    "thecover.cn": {
-        "name": "封面新闻",
-        "base_url": "https://www.thecover.cn",
-        "list_url": "https://www.thecover.cn",
-        "article_pattern": r'/detail/\d+',
-        "industry": "综合",
-        "rss": None,
-    },
-    "game.china.com": {
-        "name": "中华网游戏",
-        "base_url": "https://game.china.com",
-        "list_url": "https://game.china.com",
-        "article_pattern": r'/[\w/]+/\d+\.shtml',
-        "industry": "游戏",
-        "rss": None,
-    },
-
     # ===== 手机3C / 消费电子 =====
     "ithome.com": {
         "name": "IT之家",
@@ -92,45 +43,13 @@ WHITELIST_SOURCES = {
         "industry": "3C数码",
         "rss": None,
     },
-    "zhidx.com": {
-        "name": "智东西",
-        "base_url": "https://zhidx.com",
-        "list_url": "https://zhidx.com",
-        "article_pattern": r'/[\w-]+/\d+\.html',
-        "industry": "智能硬件",
-        "rss": "https://zhidx.com/feed/",
-    },
 
     # ===== 新能源汽车 =====
-    "autohome.com.cn": {
-        "name": "汽车之家",
-        "base_url": "https://www.autohome.com.cn",
-        "list_url": "https://www.autohome.com.cn",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "新能源汽车",
-        "rss": None,
-    },
-    "dongchedi.com": {
-        "name": "懂车帝",
-        "base_url": "https://www.dongchedi.com",
-        "list_url": "https://www.dongchedi.com",
-        "article_pattern": r'/[\w/]+/\d+',
-        "industry": "新能源汽车",
-        "rss": None,
-    },
-    "d1ev.com": {
-        "name": "第一电动",
-        "base_url": "https://www.d1ev.com",
-        "list_url": "https://www.d1ev.com",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "新能源汽车",
-        "rss": None,
-    },
-    "chinanev.net": {
-        "name": "中国新能源汽车网",
-        "base_url": "http://www.chinanev.net",
-        "list_url": "http://www.chinanev.net/news/",
-        "article_pattern": r'/[\w/]+/\d+\.html',
+    "cheshi.com": {
+        "name": "网上车市",
+        "base_url": "https://www.cheshi.com",
+        "list_url": "https://www.cheshi.com",
+        "article_pattern": r'/dujia/\d+',
         "industry": "新能源汽车",
         "rss": None,
     },
@@ -148,54 +67,22 @@ WHITELIST_SOURCES = {
         "name": "品观网",
         "base_url": "https://www.pinguan.com",
         "list_url": "https://www.pinguan.com",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "美妆护肤",
-        "rss": None,
-    },
-    "c2cc.com.cn": {
-        "name": "C2CC传媒",
-        "base_url": "https://www.c2cc.com.cn",
-        "list_url": "https://www.c2cc.com.cn",
-        "article_pattern": r'/[\w/]+/\d+\.html',
+        "article_pattern": r'/article/\w+/\d+',
         "industry": "美妆护肤",
         "rss": None,
     },
 
     # ===== 食品粮油 =====
-    "foodmate.net": {
+    "news.foodmate.net": {
         "name": "食品伙伴网",
-        "base_url": "https://www.foodmate.net",
-        "list_url": "https://www.foodmate.net",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "食品粮油",
-        "rss": "https://www.foodmate.net/rss/news.xml",
-    },
-    "foodtalks.cn": {
-        "name": "FoodTalks",
-        "base_url": "https://www.foodtalks.cn",
-        "list_url": "https://www.foodtalks.cn",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "食品粮油",
-        "rss": "https://www.foodtalks.cn/feed",
-    },
-    "cnfoodnet.com": {
-        "name": "中国食品网",
-        "base_url": "http://www.cnfoodnet.com",
-        "list_url": "http://www.cnfoodnet.com",
-        "article_pattern": r'/[\w/]+/\d+\.html',
+        "base_url": "https://news.foodmate.net",
+        "list_url": "https://news.foodmate.net",
+        "article_pattern": r'/\d+/\d+\.html',
         "industry": "食品粮油",
         "rss": None,
     },
 
     # ===== 机器人 / AI =====
-    "jiqizhixin.com": {
-        "name": "机器之心",
-        "base_url": "https://jiqizhixin.com",
-        "list_url": "https://jiqizhixin.com",
-        "article_pattern": r'/[\w/]+/\d+\.html',
-        "industry": "AI科技",
-        "rss": "https://jiqizhixin.com/rss",
-    },
     "robot-china.com": {
         "name": "中国机器人网",
         "base_url": "https://www.robot-china.com",
@@ -204,22 +91,20 @@ WHITELIST_SOURCES = {
         "industry": "机器人",
         "rss": None,
     },
-
-    # ===== 半导体 =====
-    "xingdongai.com": {
-        "name": "芯东西",
-        "base_url": "https://www.xingdongai.com",
-        "list_url": "https://www.xingdongai.com",
+    "big-bit.com": {
+        "name": "大比特网",
+        "base_url": "https://www.big-bit.com",
+        "list_url": "https://www.big-bit.com",
         "article_pattern": r'/[\w/]+/\d+\.html',
         "industry": "半导体",
         "rss": None,
     },
 
-    # ===== 企业服务/SaaS =====
-    "niutoushe.com": {
-        "name": "牛透社",
-        "base_url": "https://www.niutoushe.com",
-        "list_url": "https://www.niutoushe.com",
+    # ===== 企业服务 / SaaS =====
+    "saasruanjian.com": {
+        "name": "SaaS点评网",
+        "base_url": "https://www.saasruanjian.com",
+        "list_url": "https://www.saasruanjian.com",
         "article_pattern": r'/[\w/]+/\d+\.html',
         "industry": "企业服务",
         "rss": None,
@@ -406,53 +291,48 @@ def _fetch_rss_feed(rss_url: str, timeout: int = 15) -> Optional[str]:
         return None
 
 
-def _parse_rss_and_filter(html: str, base_url: str, keywords: List[str] = None,
+def _parse_rss_and_filter(xml_content: str, base_url: str, keywords: List[str] = None,
                           max_articles: int = 50) -> List[Dict]:
     """
     解析 RSS XML，提取文章列表，按关键词过滤。
     返回格式同 _extract_articles_from_homepage。
+    使用 BeautifulSoup 解析 XML，更好的中文媒体兼容性。
     """
     articles = []
     try:
-        from xml.etree import ElementTree as ET
-        # 清理无效字符
-        html_clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', html)
-        root = ET.fromstring(html_clean.encode('utf-8'))
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(xml_content, 'xml')
 
-        # 尝试通用 RSS 命名空间
-        namespaces = ['', 'http://www.w3.org/2005/Atom', 'http://purl.org/rss/1.0/']
-        items = []
-        for ns in namespaces:
-            items = root.findall(f'.//{ns}item') or root.findall(f'.//{ns}entry') or []
-            if items:
-                break
+        # 尝试找 feed/entry 结构
+        items = soup.find_all('item') or soup.find_all('entry')
+        if not items:
+            # 尝试 Atom 格式
+            items = soup.find_all('link')
 
         seen_urls = set()
         for item in items[:max_articles]:
             # 提取 title
-            title = None
-            for ns in namespaces:
-                t = item.find(f'{ns}title') or item.find(f'.//{ns}title')
-                if t is not None and t.text:
-                    title = t.text.strip()
-                    break
+            title_elem = item.find('title')
+            title = title_elem.get_text(strip=True) if title_elem else ""
 
             # 提取 link
             link = None
-            for ns in namespaces:
-                l = item.find(f'{ns}link')
-                if l is not None:
-                    link = l.text or l.get('href') or None
-                    if link:
-                        link = link.strip()
-                        break
+            link_elem = item.find('link')
+            if link_elem:
+                link = link_elem.get('href') or link_elem.get_text(strip=True) or None
+            if not link:
+                # 尝试 Atom 格式的 link
+                if item.name == 'link':
+                    link = item.get('href')
+            if not link:
+                continue
 
             # 提取 pubDate
             pub_date = ""
-            for ns in namespaces:
-                d = item.find(f'{ns}pubDate') or item.find(f'{ns}published') or item.find(f'{ns}updated')
-                if d is not None and d.text:
-                    pub_date = d.text.strip()
+            for date_elem_name in ['pubDate', 'published', 'updated', 'date']:
+                date_elem = item.find(date_elem_name)
+                if date_elem:
+                    pub_date = date_elem.get_text(strip=True)
                     break
 
             if not title or not link:
