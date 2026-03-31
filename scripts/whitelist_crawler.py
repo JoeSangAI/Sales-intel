@@ -141,6 +141,18 @@ WHITELIST_SOURCES = {
         "industry": "智能硬件",
         "rss": None,
     },
+
+    # ===== 新能源汽车 =====
+    "nev.cn": {
+        "name": "新能源网",
+        "base_url": "https://www.nev.cn",
+        "list_url": "https://www.nev.cn",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+
+    # ===== 机器人 / AI =====
     "robot-china.com": {
         "name": "中国机器人网",
         "base_url": "https://www.robot-china.com",
@@ -157,6 +169,17 @@ WHITELIST_SOURCES = {
         "industry": "AI科技",
         "rss": None,
     },
+
+    # ===== 半导体 =====
+    "semiw.com": {
+        "name": "半导体世界",
+        "base_url": "https://www.semiw.com",
+        "list_url": "https://www.semiw.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "半导体",
+        "rss": None,
+    },
+
 
     # ===== 智能硬件 / IoT =====
     "iotworld.com.cn": {
