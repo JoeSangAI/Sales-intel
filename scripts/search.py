@@ -33,7 +33,7 @@ def search_tavily(
     主搜索函数：仅使用 Bocha，限流时自动等待重试。
     函数名保留 search_tavily 以兼容已有调用。
     """
-    bocha_key = api_key or _get_bocha_key()
+    bocha_key = api_key or get_api_key()
     if not bocha_key:
         return []
 
@@ -115,7 +115,7 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     """根据品牌配置生成搜索查询列表
 
     策略：短查询 + 多角度覆盖，每条查询关键词不超过3个（Bocha 对长 OR 查询支持差）。
-    每个品牌最多 4 条查询（泛搜索 + site 精准搜索），控制 API 消耗。
+    每个品牌最多 3 条查询，控制 API 消耗。
     """
     queries = []
     name = brand_config["name"]
@@ -123,8 +123,6 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     keywords = brand_config.get("keywords", [])
     lang = brand_config.get("lang", "zh")
     all_names = list(set(sub_brands + [name]))
-
-    # ========== 泛搜索（原有，保持不变）==========
 
     # 查询 1：品牌 + 高价值信号词（短查询，最多3个 OR）
     high_signals = [k for k in keywords if k in ("发布会", "新品", "代言人", "新车", "品牌升级", "广告", "营销")]
@@ -169,22 +167,6 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
             "brand_names": all_names,
             "type": "brand_en",
             "lang": "en",
-        })
-
-    # ========== Site 精准搜索（新增）==========
-    # 获取该品牌所属行业对应的垂类媒体
-    media_sites = get_media_sites_for_brand(brand_config, max_sites=5)
-    if media_sites:
-        # 构建 site: 查询字符串
-        # 例如: "vivo site:ithome.com OR site:36kr.com OR site:huxiu.com"
-        site_part = " OR ".join(f"site:{d}" for d in media_sites)
-        queries.append({
-            "query": f'{name} {site_part}',
-            "brand": name,
-            "brand_names": all_names,
-            "type": "brand_site",
-            "lang": "zh",
-            "media_sites": media_sites,  # 附加信息，用于后续过滤
         })
 
     return queries
@@ -346,16 +328,6 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
             if not any(bn and bn.lower() in text_to_check.lower() for bn in brand_names):
                 continue  # 品牌名不在标题和内容前200字中，丢弃
 
-        # ── Site 精准搜索的域名过滤 ──────────────────────────
-        # brand_site 查询结果必须来自指定的垂类媒体
-        # Bocha site: 查询虽然有限定，但结果可能包含其他域名，需要二次过滤
-        if qtype == "brand_site":
-            media_sites = q.get("media_sites", [])
-            if media_sites:
-                url_domain = _normalize_domain(urlparse(url).netloc)
-                if not any(site in url_domain or url_domain in site for site in media_sites):
-                    continue  # 不在指定媒体列表中，丢弃
-
         # ── 融资查询的域名质量过滤 ──────────────────────────
         # 融资新闻必须来自可信媒体，过滤行业报告站/SEO站
         # 使用归一化域名匹配（去除 www. 前缀）避免误匹配
@@ -455,75 +427,6 @@ def load_brand_industry_map() -> dict:
         return brand_map
     except Exception:
         return {}
-
-
-# ── 行业垂类媒体加载（用于 site: 精准搜索）────────────────────────
-
-_INDUSTRY_MEDIA_CACHE = None
-
-
-def load_industry_media() -> dict:
-    """
-    加载 config.yaml 中的 industry_media 配置。
-    返回: {行业名: [域名列表]}
-    """
-    global _INDUSTRY_MEDIA_CACHE
-    if _INDUSTRY_MEDIA_CACHE is not None:
-        return _INDUSTRY_MEDIA_CACHE
-
-    import yaml
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-
-        media_map = {}
-        for entry in config.get("industry_media", []):
-            industry = entry.get("industry", "")
-            domains = entry.get("domains", {})
-            if industry and domains:
-                # domains 格式: {媒体名: 域名}
-                domain_list = list(domains.values())
-                media_map[industry] = domain_list
-
-        _INDUSTRY_MEDIA_CACHE = media_map
-        return media_map
-    except Exception as e:
-        print(f"[警告] 加载 industry_media 失败: {e}")
-        return {}
-
-
-def get_media_sites_for_brand(brand_config: dict, max_sites: int = 5) -> list[str]:
-    """
-    根据品牌所属行业，返回对应的垂类媒体域名列表。
-    用于 Bocha site: 精准搜索。
-    """
-    brand_name = brand_config.get("name", "")
-    brand_industry = brand_config.get("industry", "")
-
-    media_map = load_industry_media()
-    sites = []
-
-    # 优先用品牌自己的行业
-    if brand_industry and brand_industry in media_map:
-        sites.extend(media_map[brand_industry])
-
-    # 补充泛科技媒体（所有行业都可能用到）
-    common_sites = [
-        "36kr.com", "huxiu.com", "tmtpost.com",
-        "ithome.com", "jiqizhixin.com", "zhidx.com"
-    ]
-
-    # 去重并限制数量
-    seen = set(sites)
-    for site in common_sites:
-        if site not in seen:
-            sites.append(site)
-            seen.add(site)
-            if len(sites) >= max_sites:
-                break
-
-    return sites[:max_sites]
 
 
 # ── 融资专项搜索 ──────────────────────────────────────────

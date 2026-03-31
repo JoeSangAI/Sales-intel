@@ -147,12 +147,6 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
                 if qtype in ("brand_main", "brand_biz", "sub_brand", "brand_en"):
                     if not any(d in url for d in ZH_NEWS_DOMAINS):
                         continue
-                # Site 精准搜索：结果必须来自指定的垂类媒体
-                if qtype == "brand_site":
-                    media_sites = q.get("media_sites", [])
-                    if media_sites:
-                        if not any(site in url for site in media_sites):
-                            continue
                 # 融资查询使用融资专用白名单
                 if qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
                     if not any(d in url for d in ZH_FUNDRAISING_DOMAINS):
