@@ -226,6 +226,34 @@ WHITELIST_SOURCES = {
         "industry": "企业服务",
         "rss": None,
     },
+
+    # ===== 财经 / 跨行业 =====
+    "stcn.com": {
+        "name": "证券时报",
+        "base_url": "https://www.stcn.com",
+        "list_url": "https://www.stcn.com",
+        "article_pattern": r'/article/detail/\d+\.html',
+        "industry": "财经",
+        "rss": None,
+    },
+    "tmtpost.com": {
+        "name": "钛媒体",
+        "base_url": "https://www.tmtpost.com",
+        "list_url": "https://www.tmtpost.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "AI科技",
+        "rss": "https://www.tmtpost.com/rss",
+    },
+
+    # ===== 企业服务 / SaaS =====
+    "niutoushe.com": {
+        "name": "牛透社",
+        "base_url": "https://www.niutoushe.com",
+        "list_url": "https://www.niutoushe.com",
+        "article_pattern": r'/\d+',
+        "industry": "企业服务",
+        "rss": "https://www.niutoushe.com/rss",
+    },
 }
 
 
