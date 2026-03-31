@@ -43,6 +43,14 @@ WHITELIST_SOURCES = {
         "industry": "3C数码",
         "rss": None,
     },
+    "leiphone.com": {
+        "name": "雷锋网",
+        "base_url": "https://www.leiphone.com",
+        "list_url": "https://www.leiphone.com",
+        "article_pattern": r'/banner/homepageUrl/id/\d+',
+        "industry": "3C数码",
+        "rss": None,
+    },
 
     # ===== 新能源汽车 =====
     "cheshi.com": {
@@ -50,6 +58,14 @@ WHITELIST_SOURCES = {
         "base_url": "https://www.cheshi.com",
         "list_url": "https://www.cheshi.com",
         "article_pattern": r'/dujia/\d+',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+    "d1ev.com": {
+        "name": "第一电动",
+        "base_url": "https://www.d1ev.com",
+        "list_url": "https://www.d1ev.com/news/shichang",
+        "article_pattern": r'/news/shichang/\d+',
         "industry": "新能源汽车",
         "rss": None,
     },
@@ -68,6 +84,14 @@ WHITELIST_SOURCES = {
         "base_url": "https://www.pinguan.com",
         "list_url": "https://www.pinguan.com",
         "article_pattern": r'/article/\w+/\d+',
+        "industry": "美妆护肤",
+        "rss": None,
+    },
+    "chinabeauty.cn": {
+        "name": "中国美妆网",
+        "base_url": "https://www.chinabeauty.cn",
+        "list_url": "https://www.chinabeauty.cn",
+        "article_pattern": r'/news/\d+\.html',
         "industry": "美妆护肤",
         "rss": None,
     },
@@ -91,11 +115,29 @@ WHITELIST_SOURCES = {
         "industry": "机器人",
         "rss": None,
     },
+    "zhidx.com": {
+        "name": "智东西",
+        "base_url": "https://zhidx.com",
+        "list_url": "https://zhidx.com",
+        "article_pattern": r'/p/\d+\.html',
+        "industry": "AI科技",
+        "rss": None,
+    },
+
+    # ===== 半导体 =====
     "big-bit.com": {
         "name": "大比特网",
         "base_url": "https://www.big-bit.com",
         "list_url": "https://www.big-bit.com",
         "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "半导体",
+        "rss": None,
+    },
+    "eetop.cn": {
+        "name": "EETOP",
+        "base_url": "https://www.eetop.cn",
+        "list_url": "https://www.eetop.cn",
+        "article_pattern": r'/semi/\d+\.html',
         "industry": "半导体",
         "rss": None,
     },
