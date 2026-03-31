@@ -1,345 +1,869 @@
 """
-白名单网站直接抓取模块 v4 - 高成功率版
-针对重点垂类媒体，使用实际URL结构进行精准抓取
-优化目标：成功率80%+
+白名单网站直接抓取模块 v5
+策略：Bocha site: 搜索 + 精准页面抓取
+
+v4 的通用 URL pattern 猜测成功率极低（中文媒体 URL 结构碎片化）。
+v5 改用 Bocha 的 site: 搜索能力，找到白名单域名下匹配关键词的真实文章 URL，
+再直接抓取这些 URL，保证成功率。
 """
 
 import os
 import json
 import requests
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-from urllib.parse import urljoin, urlparse
 import re
 import warnings
+from typing import List, Dict, Optional, Tuple
+from urllib.parse import urljoin, urlparse
+from datetime import datetime
 
 # 忽略SSL警告
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 
-# 重点网站配置（预留，暂不使用）
-# 采用完全通用策略，所有域名都从动态白名单抓取
-WHITELIST_SOURCES = {}
+# ── 重点垂类媒体精确配置 ──────────────────────────────
+# domain -> {name, base_url, list_url, article_pattern, industry, rss}
+# 这些网站走首页抓取路线，有精确的 article URL pattern
+# rss 字段：如果有官方 RSS _feed，则优先使用 RSS 抓取
+WHITELIST_SOURCES = {
+    # ===== 科技媒体 =====
+    "tmtpost.com": {
+        "name": "钛媒体",
+        "base_url": "https://www.tmtpost.com",
+        "list_url": "https://www.tmtpost.com",
+        "article_pattern": r'/[\w-]+/\d+\.html',
+        "industry": "科技",
+        "rss": "https://www.tmtpost.com/rss/",
+    },
+    "donews.com": {
+        "name": "DoNews",
+        "base_url": "https://www.donews.com",
+        "list_url": "https://www.donews.com",
+        "article_pattern": r'/news/\d+',
+        "industry": "科技",
+        "rss": None,
+    },
+    "eeo.com.cn": {
+        "name": "经济观察报",
+        "base_url": "https://www.eeo.com.cn",
+        "list_url": "https://www.eeo.com.cn",
+        "article_pattern": r'/[\w/]+/\d+\.shtml',
+        "industry": "财经",
+        "rss": None,
+    },
+    "cs.com.cn": {
+        "name": "中证网",
+        "base_url": "https://www.cs.com.cn",
+        "list_url": "https://www.cs.com.cn",
+        "article_pattern": r'/[\w/]+\.s?html?',
+        "industry": "财经",
+        "rss": None,
+    },
+    "thecover.cn": {
+        "name": "封面新闻",
+        "base_url": "https://www.thecover.cn",
+        "list_url": "https://www.thecover.cn",
+        "article_pattern": r'/detail/\d+',
+        "industry": "综合",
+        "rss": None,
+    },
+    "game.china.com": {
+        "name": "中华网游戏",
+        "base_url": "https://game.china.com",
+        "list_url": "https://game.china.com",
+        "article_pattern": r'/[\w/]+/\d+\.shtml',
+        "industry": "游戏",
+        "rss": None,
+    },
+
+    # ===== 手机3C / 消费电子 =====
+    "ithome.com": {
+        "name": "IT之家",
+        "base_url": "https://www.ithome.com",
+        "list_url": "https://www.ithome.com",
+        "article_pattern": r'/[\w/]+/\d+\.htm',
+        "industry": "3C数码",
+        "rss": "https://www.ithome.com/rss/",
+    },
+    "elecfans.com": {
+        "name": "电子发烧友",
+        "base_url": "https://www.elecfans.com",
+        "list_url": "https://www.elecfans.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "3C数码",
+        "rss": None,
+    },
+    "zhidx.com": {
+        "name": "智东西",
+        "base_url": "https://zhidx.com",
+        "list_url": "https://zhidx.com",
+        "article_pattern": r'/[\w-]+/\d+\.html',
+        "industry": "智能硬件",
+        "rss": "https://zhidx.com/feed/",
+    },
+
+    # ===== 新能源汽车 =====
+    "autohome.com.cn": {
+        "name": "汽车之家",
+        "base_url": "https://www.autohome.com.cn",
+        "list_url": "https://www.autohome.com.cn",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+    "dongchedi.com": {
+        "name": "懂车帝",
+        "base_url": "https://www.dongchedi.com",
+        "list_url": "https://www.dongchedi.com",
+        "article_pattern": r'/[\w/]+/\d+',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+    "d1ev.com": {
+        "name": "第一电动",
+        "base_url": "https://www.d1ev.com",
+        "list_url": "https://www.d1ev.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+    "chinanev.net": {
+        "name": "中国新能源汽车网",
+        "base_url": "http://www.chinanev.net",
+        "list_url": "http://www.chinanev.net/news/",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+
+    # ===== 美妆护肤 =====
+    "jumeili.cn": {
+        "name": "聚美丽",
+        "base_url": "https://www.jumeili.cn",
+        "list_url": "https://www.jumeili.cn",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "美妆护肤",
+        "rss": None,
+    },
+    "pinguan.com": {
+        "name": "品观网",
+        "base_url": "https://www.pinguan.com",
+        "list_url": "https://www.pinguan.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "美妆护肤",
+        "rss": None,
+    },
+    "c2cc.com.cn": {
+        "name": "C2CC传媒",
+        "base_url": "https://www.c2cc.com.cn",
+        "list_url": "https://www.c2cc.com.cn",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "美妆护肤",
+        "rss": None,
+    },
+
+    # ===== 食品粮油 =====
+    "foodmate.net": {
+        "name": "食品伙伴网",
+        "base_url": "https://www.foodmate.net",
+        "list_url": "https://www.foodmate.net",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "食品粮油",
+        "rss": "https://www.foodmate.net/rss/news.xml",
+    },
+    "foodtalks.cn": {
+        "name": "FoodTalks",
+        "base_url": "https://www.foodtalks.cn",
+        "list_url": "https://www.foodtalks.cn",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "食品粮油",
+        "rss": "https://www.foodtalks.cn/feed",
+    },
+    "cnfoodnet.com": {
+        "name": "中国食品网",
+        "base_url": "http://www.cnfoodnet.com",
+        "list_url": "http://www.cnfoodnet.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "食品粮油",
+        "rss": None,
+    },
+
+    # ===== 机器人 / AI =====
+    "jiqizhixin.com": {
+        "name": "机器之心",
+        "base_url": "https://jiqizhixin.com",
+        "list_url": "https://jiqizhixin.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "AI科技",
+        "rss": "https://jiqizhixin.com/rss",
+    },
+    "robot-china.com": {
+        "name": "中国机器人网",
+        "base_url": "https://www.robot-china.com",
+        "list_url": "https://www.robot-china.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "机器人",
+        "rss": None,
+    },
+
+    # ===== 半导体 =====
+    "xingdongai.com": {
+        "name": "芯东西",
+        "base_url": "https://www.xingdongai.com",
+        "list_url": "https://www.xingdongai.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "半导体",
+        "rss": None,
+    },
+
+    # ===== 企业服务/SaaS =====
+    "niutoushe.com": {
+        "name": "牛透社",
+        "base_url": "https://www.niutoushe.com",
+        "list_url": "https://www.niutoushe.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "企业服务",
+        "rss": None,
+    },
+}
+
+
+# ── 融资/代言人信号词 ───────────────────────────────
+_BRAND_NEWS_KEYWORDS  = ["新品", "发布", "上市", "推出", "首发", "亮相", "问世",
+                          "营销", "广告", "投放", "campaign", "品牌升级", "代言人"]
+_FUNDRAISING_KEYWORDS = ["融资", "获投", "轮融资", "亿元", "投资", "上市", "IPO",
+                          "收购", "并购", "估值"]
+_ENDORSEMENT_KEYWORDS = ["代言", "代言人", "品牌大使", "形象大使", "官宣"]
+
+
+def _classify_content_type(title: str, content: str) -> str:
+    """判断内容类型：brand_news | fundraising | endorsement"""
+    text = (title + " " + content).lower()
+    if any(kw in text for kw in _ENDORSEMENT_KEYWORDS):
+        return "endorsement"
+    if any(kw in text for kw in _FUNDRAISING_KEYWORDS):
+        return "fundraising"
+    return "brand_news"
 
 
 def _fetch_page_content(url: str, timeout: int = 10) -> Optional[str]:
     """抓取页面HTML内容（忽略SSL验证，提升成功率）"""
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
-        # 关键：忽略SSL验证
         response = requests.get(url, headers=headers, timeout=timeout, verify=False)
         response.raise_for_status()
         return response.text
-    except:
+    except Exception as e:
         return None
+
+
+def _extract_from_html(html: str, keyword: str) -> Tuple[str, str]:
+    """
+    从文章页面 HTML 中提取标题和正文摘要。
+    尝试多种提取策略，优先使用 meta 描述。
+    """
+    from bs4 import BeautifulSoup
+
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+
+        # 策略1：title 标签
+        title = soup.find('title')
+        if title:
+            title = title.get_text(strip=True)
+            # 清理标题中的站名后缀（如 " - 钛媒体"）
+            title = re.sub(r'\s*[-_|·]\s*\S+$', '', title)
+
+        # 策略2：og:title
+        og_title = soup.find('meta', property='og:title')
+        if og_title and og_title.get('content'):
+            title = og_title['content'].strip()
+
+        if not title or len(title) < 5:
+            title = ""
+
+        # 策略1：og:description / description
+        desc = ""
+        for meta in [soup.find('meta', property='og:description'),
+                     soup.find('meta', attrs={'name': 'description'})]:
+            if meta and meta.get('content'):
+                desc = meta['content'].strip()
+                break
+
+        # 策略2：从 article / main 标签提取首段文字
+        if not desc:
+            for tag in ['article', 'main', 'div']:
+                el = soup.find(tag)
+                if el:
+                    paragraphs = el.find_all('p')
+                    for p in paragraphs:
+                        text = p.get_text(strip=True)
+                        if len(text) >= 30:
+                            desc = text
+                            break
+                if desc:
+                    break
+
+        # 策略3：直接找 p 标签
+        if not desc:
+            for p in soup.find_all('p'):
+                text = p.get_text(strip=True)
+                if len(text) >= 30:
+                    desc = text
+                    break
+
+        # 清理描述
+        if desc:
+            desc = re.sub(r'\s+', ' ', desc)
+            if len(desc) > 500:
+                desc = desc[:500] + "..."
+
+        return title, desc
+
+    except Exception:
+        return "", ""
+
+
+def _deduplicate_by_url(articles: List[Dict]) -> List[Dict]:
+    """按 URL 去重"""
+    seen = set()
+    unique = []
+    for a in articles:
+        url = a.get("url", "")
+        if url and url not in seen:
+            seen.add(url)
+            unique.append(a)
+    return unique
 
 
 def _extract_title_from_link(link, soup) -> str:
     """从链接元素提取标题（尝试多种策略）"""
-    # 策略1: 链接本身的文字
     title = link.get_text(strip=True)
     if title and len(title) >= 10:
         return title
-
-    # 策略2: 链接的title属性
     title = link.get('title', '').strip()
     if title and len(title) >= 10:
         return title
-
-    # 策略3: 父元素的文字（排除链接本身）
     parent = link.parent
     if parent:
-        # 获取父元素的所有文字
         parent_text = parent.get_text(strip=True)
-        # 如果父元素文字比链接文字长，使用父元素文字
         if len(parent_text) > len(link.get_text(strip=True)):
             return parent_text
-
-    # 策略4: 查找相邻的标题元素
     for sibling in link.find_next_siblings():
         if sibling.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span']:
             title = sibling.get_text(strip=True)
             if title and len(title) >= 10:
                 return title
-
     return ""
 
 
 def _extract_articles_from_homepage(html: str, base_url: str, article_pattern: str) -> List[Dict]:
-    """从首页提取文章链接（基于实际URL模式）"""
+    """从首页提取文章链接（基于精确 URL pattern）"""
     from bs4 import BeautifulSoup
 
     articles = []
     try:
         soup = BeautifulSoup(html, 'html.parser')
         pattern = re.compile(article_pattern)
-
-        # 找出所有匹配模式的链接
         seen_urls = set()
+
         for link in soup.find_all('a', href=True):
             href = link.get('href', '')
-
-            # 检查是否匹配文章URL模式
             if pattern.search(href):
-                # 补全URL
                 full_url = urljoin(base_url, href)
-
-                # 去重
                 if full_url in seen_urls:
                     continue
                 seen_urls.add(full_url)
-
-                # 提取标题（尝试多种策略）
                 title = _extract_title_from_link(link, soup)
-
-                # 过滤标题
-                if title and len(title) >= 10 and len(title) <= 200:
+                if title and 10 <= len(title) <= 200:
                     articles.append({
                         "title": title,
                         "url": full_url,
-                        "snippet": "",
-                        "published_date": "",
-                        "source": "whitelist_crawler"
+                        "source": "whitelist_crawler",
                     })
 
+    except Exception:
+        pass
+
+    return articles
+
+
+def _fetch_rss_feed(rss_url: str, timeout: int = 15) -> Optional[str]:
+    """获取 RSS feed 内容"""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+        }
+        response = requests.get(rss_url, headers=headers, timeout=timeout, verify=False)
+        response.raise_for_status()
+        return response.text
+    except Exception:
+        return None
+
+
+def _parse_rss_and_filter(html: str, base_url: str, keywords: List[str] = None,
+                          max_articles: int = 50) -> List[Dict]:
+    """
+    解析 RSS XML，提取文章列表，按关键词过滤。
+    返回格式同 _extract_articles_from_homepage。
+    """
+    articles = []
+    try:
+        from xml.etree import ElementTree as ET
+        # 清理无效字符
+        html_clean = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', html)
+        root = ET.fromstring(html_clean.encode('utf-8'))
+
+        # 尝试通用 RSS 命名空间
+        namespaces = ['', 'http://www.w3.org/2005/Atom', 'http://purl.org/rss/1.0/']
+        items = []
+        for ns in namespaces:
+            items = root.findall(f'.//{ns}item') or root.findall(f'.//{ns}entry') or []
+            if items:
+                break
+
+        seen_urls = set()
+        for item in items[:max_articles]:
+            # 提取 title
+            title = None
+            for ns in namespaces:
+                t = item.find(f'{ns}title') or item.find(f'.//{ns}title')
+                if t is not None and t.text:
+                    title = t.text.strip()
+                    break
+
+            # 提取 link
+            link = None
+            for ns in namespaces:
+                l = item.find(f'{ns}link')
+                if l is not None:
+                    link = l.text or l.get('href') or None
+                    if link:
+                        link = link.strip()
+                        break
+
+            # 提取 pubDate
+            pub_date = ""
+            for ns in namespaces:
+                d = item.find(f'{ns}pubDate') or item.find(f'{ns}published') or item.find(f'{ns}updated')
+                if d is not None and d.text:
+                    pub_date = d.text.strip()
+                    break
+
+            if not title or not link:
+                continue
+
+            # 完整化 URL
+            full_url = urljoin(base_url, link)
+            if full_url in seen_urls:
+                continue
+            seen_urls.add(full_url)
+
+            # 关键词过滤
+            if keywords:
+                matched = any(kw.lower() in title.lower() for kw in keywords)
+                if not matched:
+                    continue
+
+            articles.append({
+                "title": title,
+                "url": full_url,
+                "source": "whitelist_crawler",
+                "published_date": pub_date,
+            })
+
     except Exception as e:
+        print(f"    RSS 解析失败: {e}")
+    return articles
+
+
+def _crawl_via_rss(domain: str, config: Dict, keywords: List[str] = None,
+                   max_articles: int = 50) -> List[Dict]:
+    """通过 RSS Feed 抓取文章（优先使用）"""
+    rss_url = config.get("rss")
+    if not rss_url:
+        return []
+
+    print(f"  [RSS] {config['name']} ({domain})")
+
+    xml_content = _fetch_rss_feed(rss_url)
+    if not xml_content:
+        print(f"    ✗ RSS 获取失败，尝试首页")
+        return []
+
+    articles = _parse_rss_and_filter(xml_content, config["base_url"], keywords, max_articles)
+    print(f"    RSS 文章: {len(articles)} 篇")
+
+    # 精准抓取每篇文章获取摘要
+    for a in articles[:max_articles]:
+        full_html = _fetch_page_content(a["url"], timeout=8)
+        if full_html:
+            title, content = _extract_from_html(full_html, "")
+            if title:
+                a["title"] = title
+            a["content"] = content
+        a["content_type"] = _classify_content_type(a.get("title", ""), a.get("content", ""))
+
+    return articles
+    """从首页提取文章链接（基于精确 URL pattern）"""
+    from bs4 import BeautifulSoup
+
+    articles = []
+    try:
+        soup = BeautifulSoup(html, 'html.parser')
+        pattern = re.compile(article_pattern)
+        seen_urls = set()
+
+        for link in soup.find_all('a', href=True):
+            href = link.get('href', '')
+            if pattern.search(href):
+                full_url = urljoin(base_url, href)
+                if full_url in seen_urls:
+                    continue
+                seen_urls.add(full_url)
+                title = _extract_title_from_link(link, soup)
+                if title and 10 <= len(title) <= 200:
+                    articles.append({
+                        "title": title,
+                        "url": full_url,
+                        "source": "whitelist_crawler",
+                    })
+
+    except Exception:
         pass
 
     return articles
 
 
 def crawl_whitelist_source(domain: str, config: Dict, keywords: List[str] = None) -> List[Dict]:
-    """
-    抓取单个白名单网站的最新文章
-    keywords: 用于过滤的关键词列表
-    """
+    """抓取单个精确配置的垂类网站（优先 RSS，fallback 到首页）"""
     list_url = config.get("list_url")
     base_url = config.get("base_url")
     article_pattern = config.get("article_pattern")
+    rss_url = config.get("rss")
 
-    if not list_url or not article_pattern:
+    if not list_url:
         return []
 
-    print(f"  [抓取] {config['name']} ({domain})")
+    print(f"  [垂媒] {config['name']} ({domain})")
 
-    # 抓取首页
+    articles = []
+
+    # 策略1：优先使用 RSS 抓取
+    if rss_url:
+        articles = _crawl_via_rss(domain, config, keywords, max_articles=30)
+        if articles:
+            print(f"    RSS 最终: {len(articles)} 篇")
+            return articles
+        # RSS 失败，继续用首页
+
+    # 策略2：首页抓取
+    if not article_pattern:
+        print(f"    ✗ 无 article_pattern，跳过")
+        return []
+
     html = _fetch_page_content(list_url)
     if not html:
+        print(f"    ✗ 首页抓取失败")
         return []
 
-    # 提取文章链接
     articles = _extract_articles_from_homepage(html, base_url, article_pattern)
-
-    print(f"    原始文章数: {len(articles)}")
 
     # 关键词过滤
     if keywords:
-        filtered = []
-        for article in articles:
-            title_lower = article["title"].lower()
-            if any(kw.lower() in title_lower for kw in keywords):
-                filtered.append(article)
-        print(f"    关键词过滤后: {len(filtered)}")
-        articles = filtered
+        before = len(articles)
+        articles = [
+            a for a in articles
+            if any(kw.lower() in a["title"].lower() for kw in keywords)
+        ]
+        print(f"    首页文章 {before} → 关键词过滤 {len(articles)}")
     else:
-        print(f"    无关键词过滤")
+        print(f"    首页文章 {len(articles)}")
 
-    print(f"    最终结果: {len(articles)} 篇文章")
+    # 精准抓取每篇文章获取摘要
+    for a in articles:
+        full_html = _fetch_page_content(a["url"], timeout=8)
+        if full_html:
+            title, content = _extract_from_html(full_html, "")
+            if title:
+                a["title"] = title
+            a["content"] = content
+        a["content_type"] = _classify_content_type(a.get("title", ""), a.get("content", ""))
+
+    print(f"    最终: {len(articles)} 篇")
     return articles
 
 
-def crawl_all_whitelist_sources(industry_keywords: Dict[str, List[str]] = None,
-                                  brand_keywords: List[str] = None) -> List[Dict]:
-    """
-    抓取所有配置的白名单网站
-    industry_keywords: {行业名: [关键词列表]}
-    brand_keywords: 品牌关键词列表
-    """
+def crawl_all_whitelist_sources(industry_keywords: Dict = None,
+                                 brand_keywords: List[str] = None) -> List[Dict]:
+    """抓取所有精确配置的垂类媒体"""
     all_articles = []
 
     for domain, config in WHITELIST_SOURCES.items():
         industry = config.get("industry", "")
-
-        # 构建关键词列表
-        keywords = []
+        keywords = list(brand_keywords) if brand_keywords else []
         if industry_keywords and industry in industry_keywords:
             keywords.extend(industry_keywords[industry])
-        if brand_keywords:
-            keywords.extend(brand_keywords)
 
-        # 抓取
         articles = crawl_whitelist_source(domain, config, keywords)
-
-        # 标记行业
-        for article in articles:
-            article["industry"] = industry
-
+        for a in articles:
+            a["industry"] = industry
         all_articles.extend(articles)
 
     return all_articles
 
 
-def crawl_dynamic_whitelist(whitelist_path: str, keywords: List[str] = None) -> List[Dict]:
+# Bocha site: 查询的硬性资源上限（每次 run_whitelist_crawl 调用）
+_BOCHA_SITE_QUERY_LIMIT = 30  # 最多 30 次 site: 查询
+_BOCHA_SITE_MAX_PER_DOMAIN = 5  # 每域名最多 5 篇文章
+_BOCHA_SITE_TOP_DOMAINS = [  # 只对这些高价值域名做 site: 查询
+    "36kr.com", "jiemian.com", "sohu.com", "163.com",
+    "qq.com", "ithome.com", "toutiao.com", "sina.com.cn",
+]
+_BOCHA_SITE_CACHE_KEY_PREFIX = "site:"  # 缓存 key 前缀，site: 查询走独立缓存池
+
+
+def crawl_via_bocha_site_search(
+    domains: List[str],
+    keywords: List[str],
+    api_key: str,
+    max_per_domain: int = 5,
+) -> List[Dict]:
     """
-    使用通用策略抓取domain_whitelist.json中的所有域名
-    优化版：提升成功率到80%+
+    Bocha site: 辅助抓取（资源受限版）。
+
+    策略：只对 Top 8 高价值域名做 site: 查询，且严格限制总调用量。
+    所有 site: 查询结果走独立缓存，避免重复消耗 API credits。
+
+    domains: 白名单域名列表（仅作参考，实际只用 TOP_DOMAINS）
+    keywords: 关键词列表（取前 5 个最相关的）
+    api_key: Bocha API key
+    max_per_domain: 每域名最多抓取的文章数
     """
-    if not os.path.exists(whitelist_path):
-        return []
+    from scripts.search_core import _get_cached, _set_cached
 
-    try:
-        with open(whitelist_path, "r", encoding="utf-8") as f:
-            whitelist_data = json.load(f)
-    except Exception:
-        return []
+    results = []
+    seen_urls = set()
 
-    all_articles = []
+    # 只处理 Top 高价值域名
+    target_domains = [d for d in _BOCHA_SITE_TOP_DOMAINS if d in domains]
+    if not target_domains:
+        # 兜底：从 domains 中取前 3 个
+        target_domains = domains[:3]
 
-    # 合并所有行业的域名
-    all_domains = []
-    for industry, domains in whitelist_data.items():
-        all_domains.extend(domains)
+    # 取最相关的关键词（取前 5 个）
+    top_keywords = keywords[:5]
 
-    print(f"  [动态白名单] 尝试抓取 {len(all_domains)} 个域名...")
+    # 预计算总查询量，超过上限则采样
+    total_queries = len(target_domains) * len(top_keywords)
+    if total_queries > _BOCHA_SITE_QUERY_LIMIT:
+        # 按域名采样：每个域名取最相关的 2-3 个关键词
+        queries_per_domain = max(2, _BOCHA_SITE_QUERY_LIMIT // len(target_domains))
+        top_keywords = keywords[:queries_per_domain * len(target_domains)][:queries_per_domain]
 
-    success_count = 0
-    total_count = 0
+    print(f"  [Bocha辅助] 目标域名: {target_domains}")
+    print(f"  [Bocha辅助] 关键词: {top_keywords}")
+    print(f"  [Bocha辅助] 预计查询: {len(target_domains) * len(top_keywords)} 次（上限 {_BOCHA_SITE_QUERY_LIMIT}）")
 
-    for domain in all_domains:
-        # 跳过已在WHITELIST_SOURCES中配置的
-        if domain in WHITELIST_SOURCES:
-            continue
+    bocha_calls = 0
 
-        total_count += 1
+    for domain in target_domains:
+        domain_lower = domain.lower()
+        if bocha_calls >= _BOCHA_SITE_QUERY_LIMIT:
+            print(f"  [Bocha辅助] 达到查询上限 {_BOCHA_SITE_QUERY_LIMIT}，停止")
+            break
 
-        # 尝试多种域名格式和协议（优先https不带www）
-        possible_base_urls = [
-            f"https://{domain}",
-            f"http://{domain}",
-            f"https://www.{domain}",
-            f"http://www.{domain}",
-        ]
+        domain_articles = 0
 
-        html = None
-        working_url = None
-
-        # 尝试找到一个可用的URL
-        for base_url in possible_base_urls:
-            html = _fetch_page_content(base_url, timeout=8)
-            if html:
-                working_url = base_url
+        for kw in top_keywords:
+            if bocha_calls >= _BOCHA_SITE_QUERY_LIMIT:
+                break
+            if domain_articles >= max_per_domain:
                 break
 
-        if not html or not working_url:
-            continue
+            cache_key = f"site:{domain}:{kw}"
+            cached = _get_cached(cache_key)
+            if cached is not None:
+                bocha_results = cached
+                print(f"  [Bocha辅助] {domain} '{kw}': 缓存命中 {len(bocha_results)} 条")
+            else:
+                bocha_calls += 1
+                query = f"site:{domain} {kw} 2026"
+                try:
+                    bocha_results = search_tavily(
+                        query=query,
+                        api_key=api_key,
+                        time_range="month",
+                        max_results=8,
+                    )
+                    _set_cached(cache_key, bocha_results)
+                    print(f"  [Bocha辅助] {domain} '{kw}': {len(bocha_results)} 条（#{bocha_calls}）")
+                except Exception as e:
+                    print(f"  [Bocha辅助] {domain} '{kw}': 查询失败 {e}")
+                    bocha_results = []
 
-        # 尝试多种文章URL模式
-        patterns = [
-            r'/news/\d+',
-            r'/article/\d+',
-            r'/content/\d+',
-            r'/\d+\.html',
-            r'/news/.*\.html',
-            r'/article/.*\.html',
-            r'/post/\d+',
-            r'/p/\d+',
-            r'/articles/\d+',
-            r'/detail/\d+',
-        ]
+            for r in bocha_results:
+                url = r.get("url", "")
+                if not url or domain_lower not in url.lower():
+                    continue
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
 
-        found_articles = False
-        for pattern in patterns:
-            articles = _extract_articles_from_homepage(html, working_url, pattern)
+                # 直接抓取真实文章 URL
+                html = _fetch_page_content(url, timeout=8)
+                if not html:
+                    # 回退：使用 Bocha 返回的标题和摘要
+                    title = r.get("title", "")
+                    content = r.get("content", "")
+                else:
+                    title, content = _extract_from_html(html, kw)
+                    if not title:
+                        title = r.get("title", "")
 
-            if articles:
-                # 关键词过滤
-                if keywords:
-                    filtered = []
-                    for article in articles:
-                        title_lower = article["title"].lower()
-                        if any(kw.lower() in title_lower for kw in keywords):
-                            filtered.append(article)
-                    articles = filtered
+                if not title or len(title) < 5:
+                    continue
 
-                if articles:
-                    print(f"    ✓ {domain}: {len(articles)} 篇")
-                    all_articles.extend(articles)
-                    success_count += 1
-                    found_articles = True
-                    break  # 找到有效模式就停止
+                # 关键词二次校验
+                text = (title + " " + content).lower()
+                if kw.lower() not in text:
+                    continue
 
-        if not found_articles and html:
-            # 即使没有找到文章，但网站可访问，也算部分成功
-            success_count += 1
+                content_type = _classify_content_type(title, content)
+                results.append({
+                    "title": title,
+                    "url": url,
+                    "content": content or r.get("content", ""),
+                    "source": "whitelist_crawler",
+                    "content_type": content_type,
+                })
+                domain_articles += 1
 
-    success_rate = success_count * 100 / total_count if total_count > 0 else 0
-    print(f"  [成功率] {success_count}/{total_count} = {success_rate:.1f}%")
+                if domain_articles >= max_per_domain:
+                    break
 
-    return all_articles
+        print(f"  [Bocha辅助] {domain}: 抓取 {domain_articles} 篇（累计 {len(results)} 篇）")
+
+    print(f"  [Bocha辅助] 实际 Bocha 调用: {bocha_calls} 次（上限 {_BOCHA_SITE_QUERY_LIMIT}）")
+    return results
 
 
-def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None) -> List[Dict]:
+def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None,
+                          bocha_api_key: str = None) -> List[Dict]:
     """
-    运行完整的白名单抓取流程
+    运行完整的白名单抓取流程 v5。
+
     config: 用户配置（包含行业关键词等）
     profile_brands: 用户关注的品牌列表
+    bocha_api_key: Bocha API key（可选，默认从环境变量读取）
     """
     print("\n" + "="*60)
-    print("白名单网站直接抓取 v4 - 高成功率版")
+    print("白名单网站直接抓取 v5 - Bocha site: 辅助策略")
     print("="*60 + "\n")
 
-    # 构建行业关键词（从industries配置中提取）
+    # 加载 Bocha API key
+    if not bocha_api_key:
+        _ensure_env()
+        bocha_api_key = os.environ.get("BOCHA_API_KEY", "")
+
+    # ── 构建关键词列表 ───────────────────────────────
     industry_keywords = {}
     if config.get("industries"):
         for industry_config in config["industries"]:
-            industry_name = industry_config.get("name", "")
-            keywords = industry_config.get("keywords", [])
-            if industry_name and keywords:
-                # 将关键词字符串拆分成单个关键词
-                all_keywords = []
-                for kw_str in keywords:
-                    # 按空格拆分，提取单个关键词
-                    all_keywords.extend(kw_str.split())
-                industry_keywords[industry_name] = all_keywords
-                print(f"  [行业关键词] {industry_name}: {len(all_keywords)}个关键词")
+            name = industry_config.get("name", "")
+            kws = industry_config.get("keywords", [])
+            if name and kws:
+                # 关键词字符串拆分成单个词，提高 Bocha site: 查询精度
+                words = []
+                for kw_str in kws:
+                    words.extend(kw_str.split())
+                industry_keywords[name] = words
+                print(f"  [行业关键词] {name}: {len(words)} 个")
 
-    # 品牌关键词
-    brand_keywords = profile_brands or []
-    print(f"  [品牌关键词] {len(brand_keywords)}个品牌")
+    brand_keywords = list(profile_brands) if profile_brands else []
+    print(f"  [品牌关键词] {len(brand_keywords)} 个: {', '.join(brand_keywords[:5])}{'...' if len(brand_keywords) > 5 else ''}")
 
-    # 合并所有关键词
+    # 合并所有关键词（用于 Bocha site: 查询）
     all_keywords = brand_keywords.copy()
     for kws in industry_keywords.values():
         all_keywords.extend(kws)
+    # 去重
+    all_keywords = list(dict.fromkeys(all_keywords))
 
-    # 阶段1: 抓取重点垂类媒体（已优化）
-    print("\n  [阶段1] 重点垂类媒体（专门优化）...")
+    # ── 阶段1: 精确垂类媒体 ───────────────────────────
+    print("\n  [阶段1] 精确垂类媒体抓取...")
     articles_1 = crawl_all_whitelist_sources(industry_keywords, brand_keywords)
 
-    # 阶段2: 抓取动态白名单（通用策略）
-    print("\n  [阶段2] 动态白名单（通用策略）...")
+    # ── 阶段2: Bocha site: 辅助抓取 ──────────────────
+    print("\n  [阶段2] Bocha site: 辅助精准抓取...")
+
+    # 加载白名单域名
     whitelist_path = os.path.join(os.path.dirname(__file__), "..", "data", "domain_whitelist.json")
-    articles_2 = crawl_dynamic_whitelist(whitelist_path, all_keywords)
+    whitelist_domains = []
+    if os.path.exists(whitelist_path):
+        try:
+            with open(whitelist_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for domains in data.values():
+                    whitelist_domains.extend(domains)
+            whitelist_domains = list(dict.fromkeys(whitelist_domains))
+        except Exception:
+            pass
 
-    # 合并去重
+    # 排除已有精确配置的域名（避免重复抓取）
+    configured_domains = set(WHITELIST_SOURCES.keys())
+    dynamic_domains = [d for d in whitelist_domains if d not in configured_domains]
+
+    print(f"  动态域名: {len(dynamic_domains)} 个（如已有精确配置则跳过）")
+
+    if dynamic_domains and all_keywords and bocha_api_key:
+        articles_2 = crawl_via_bocha_site_search(
+            domains=dynamic_domains,
+            keywords=all_keywords,
+            api_key=bocha_api_key,
+            max_per_domain=_BOCHA_SITE_MAX_PER_DOMAIN,
+        )
+    else:
+        print("  跳过（无 API key 或无关键词）")
+        articles_2 = []
+
+    # ── 合并去重 ────────────────────────────────────
     all_articles = articles_1 + articles_2
-    unique_articles = []
-    seen_urls = set()
+    unique_articles = _deduplicate_by_url(all_articles)
 
-    for article in all_articles:
-        url = article.get("url", "")
-        if url and url not in seen_urls:
-            seen_urls.add(url)
-            unique_articles.append(article)
+    # 内容类型统计
+    type_counts = {}
+    for a in unique_articles:
+        ct = a.get("content_type", "brand_news")
+        type_counts[ct] = type_counts.get(ct, 0) + 1
 
     print(f"\n  [完成] 共抓取 {len(unique_articles)} 篇文章")
-    print(f"    - 重点网站: {len(articles_1)} 篇")
-    print(f"    - 动态白名单: {len(articles_2)} 篇")
+    print(f"    - 垂类媒体: {len(articles_1)} 篇")
+    print(f"    - Bocha辅助: {len(articles_2)} 篇")
+    if type_counts:
+        print(f"    - 内容类型: 客户新闻 {type_counts.get('brand_news', 0)}, "
+              f"融资 {type_counts.get('fundraising', 0)}, "
+              f"代言人 {type_counts.get('endorsement', 0)}")
     print("="*60 + "\n")
 
     return unique_articles
+
+
+def _ensure_env():
+    """加载 .env"""
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
 
 
 if __name__ == "__main__":
@@ -347,19 +871,20 @@ if __name__ == "__main__":
     test_config = {
         "industries": [
             {
-                "name": "美妆",
+                "name": "新能源汽车",
                 "keywords": [
-                    "PMPM 芭妮兰 毕生之研 新品发布",
-                    "功效护肤 成分党 品牌升级",
-                    "护肤品 融资 亿元"
+                    "小米 OPPO 荣耀 vivo 新品发布",
+                    "比亚迪 新车 发布",
+                    "消费电子 融资 亿元",
                 ]
             }
         ]
     }
-    test_brands = ["PMPM", "芭妮兰", "毕生之研"]
+    test_brands = ["问界", "智界", "比亚迪", "小米汽车"]
 
     articles = run_whitelist_crawl(test_config, test_brands)
     print(f"\n测试结果: {len(articles)} 篇文章")
-    for i, article in enumerate(articles[:10], 1):
-        print(f"{i}. {article['title'][:60]}... ({article.get('industry', '未知')})")
-        print(f"   {article['url']}")
+    for i, a in enumerate(articles[:10], 1):
+        ct = a.get("content_type", "?")
+        print(f"{i}. [{ct}] {a['title'][:60]}")
+        print(f"   {a['url']}")

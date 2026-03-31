@@ -59,20 +59,19 @@ def collect_all_queries(profiles: list[dict]) -> list[dict]:
                             existing["_profiles_needing"].append(profile.get("name", "default"))
                             break
 
-        # 行业查询（如果开启）
-        if profile.get("_include_industry", False):
-            for ind_cfg in industry_configs:
-                for q in build_industry_queries(ind_cfg):
-                    q_key = f"{q['query']}|{q.get('lang', 'zh')}"
-                    if q_key not in seen:
-                        seen.add(q_key)
-                        q["_profiles_needing"] = [profile.get("name", "default")]
-                        all_queries.append(q)
-                    else:
-                        for existing in all_queries:
-                            if existing["query"] == q["query"]:
-                                existing["_profiles_needing"].append(profile.get("name", "default"))
-                                break
+        # 行业查询
+        for ind_cfg in industry_configs:
+            for q in build_industry_queries(ind_cfg):
+                q_key = f"{q['query']}|{q.get('lang', 'zh')}"
+                if q_key not in seen:
+                    seen.add(q_key)
+                    q["_profiles_needing"] = [profile.get("name", "default")]
+                    all_queries.append(q)
+                else:
+                    for existing in all_queries:
+                        if existing["query"] == q["query"]:
+                            existing["_profiles_needing"].append(profile.get("name", "default"))
+                            break
 
         # 融资查询
         for q in build_fundraising_queries(fundraising_config):
@@ -110,8 +109,8 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
             if cached.get("date") == date_str:
                 print(f"  [搜索池] 加载缓存: {len(cached.get('results', {}))} 条查询")
                 return cached.get("results", {})
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [警告] 加载搜索池缓存失败: {e}")
 
     api_key = get_api_key()
     pool = {}  # {query_key: [results]}
@@ -148,6 +147,12 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
                 if qtype in ("brand_main", "brand_biz", "sub_brand", "brand_en"):
                     if not any(d in url for d in ZH_NEWS_DOMAINS):
                         continue
+                # Site 精准搜索：结果必须来自指定的垂类媒体
+                if qtype == "brand_site":
+                    media_sites = q.get("media_sites", [])
+                    if media_sites:
+                        if not any(site in url for site in media_sites):
+                            continue
                 # 融资查询使用融资专用白名单
                 if qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
                     if not any(d in url for d in ZH_FUNDRAISING_DOMAINS):
@@ -186,6 +191,7 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
     将搜索池结果分发给指定档案。
 
     逻辑：严格匹配品牌归属,只分发该档案 profile 中明确注册的品牌。
+    融资和行业结果也严格按 profile 配置过滤。
     """
     results = []
     profile_name = profile.get("name", "default")
@@ -197,27 +203,33 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
         for sub in brand_cfg.get("sub_brands", []):
             profile_brands.add(sub.lower())
 
+    # 构建该 profile 的融资赛道集合
+    track_configs = profile.get("fundraising", {}).get("tracks", [])
+    profile_tracks = {t.get("name", "") for t in track_configs}
+
+    # 构建该 profile 的行业集合
+    industry_configs = profile.get("industries", [])
+    profile_industries = {i.get("name", "") for i in industry_configs}
+
     for q_key, items in pool.items():
         for item in items:
             brand = item.get("brand", "")
             track = item.get("track_name", "")
 
-            # 融资结果：按赛道过滤
+            # 融资结果：严格按赛道过滤（没有配置赛道则不分发融资结果）
             if brand.startswith("[融资]"):
-                if track:
-                    track_configs = profile.get("fundraising", {}).get("tracks", [])
-                    track_names = [t.get("name", "") for t in track_configs]
-                    if track in track_names or not track_names:
+                if profile_tracks and track:
+                    # 精确匹配或模糊匹配
+                    if track in profile_tracks or any(t in track or track in t for t in profile_tracks):
                         results.append(item)
                 continue
 
-            # 行业结果：按行业名过滤
+            # 行业结果：严格按行业名过滤（精确 + 模糊匹配）
             if brand.startswith("[行业]"):
-                industry_configs = profile.get("industries", [])
-                ind_names = [i.get("name", "") for i in industry_configs]
-                ind_tag = brand.replace("[行业]", "")
-                if ind_names and ind_tag in ind_names:
-                    results.append(item)
+                ind_tag = brand.replace("[行业]", "").strip()
+                if profile_industries:
+                    if ind_tag in profile_industries or any(ind in ind_tag or ind_tag in ind for ind in profile_industries):
+                        results.append(item)
                 continue
 
             # 品牌结果：严格匹配,只有 profile 中注册的品牌才分发
@@ -228,15 +240,11 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
     return results
 
 
-def collect_single_profile_queries(profile: dict, include_industry: bool = None) -> list[dict]:
+def collect_single_profile_queries(profile: dict, include_industry: bool = True) -> list[dict]:
     """
     单档案查询收集（用于 --profile 单独运行，不走共享池）。
     等同于把 run_search 的查询构建逻辑抽出来。
     """
-    from scripts.search import is_weekly_industry_day
-    if include_industry is None:
-        include_industry = is_weekly_industry_day()
-
     queries = []
 
     # 品牌查询

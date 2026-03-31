@@ -11,191 +11,12 @@ import requests
 import concurrent.futures
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlparse
 
-# ── 搜索结果缓存（内存 + 每日磁盘文件）─────────────────────────
-# 每天一个 JSON 文件，同一天内相同查询只调一次 Bocha API
-# 文件位置：data/search_cache/bocha_YYYY-MM-DD.json
-_DISK_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "search_cache")
-_disk_cache: dict = {}       # 当天磁盘缓存（启动时加载一次）
-_disk_cache_date: str = ""   # 已加载的日期
-
-
-def _ensure_disk_cache() -> dict:
-    """确保当天磁盘缓存已加载到内存（只读一次文件）"""
-    global _disk_cache, _disk_cache_date
-    today = datetime.now().strftime("%Y-%m-%d")
-    if _disk_cache_date == today:
-        return _disk_cache
-    # 日期变了或首次加载
-    _disk_cache_date = today
-    path = os.path.join(_DISK_CACHE_DIR, f"bocha_{today}.json")
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                _disk_cache = json.load(f)
-                print(f"  [缓存] 加载当天搜索缓存: {len(_disk_cache)} 条查询")
-        except Exception:
-            _disk_cache = {}
-    else:
-        _disk_cache = {}
-    return _disk_cache
-
-
-def _flush_disk_cache() -> None:
-    """将内存缓存写回磁盘文件"""
-    os.makedirs(_DISK_CACHE_DIR, exist_ok=True)
-    today = datetime.now().strftime("%Y-%m-%d")
-    path = os.path.join(_DISK_CACHE_DIR, f"bocha_{today}.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(_disk_cache, f, ensure_ascii=False)
-
-
-def _get_cached(query: str, ttl: int = 300) -> Optional[list[dict]]:
-    """从缓存获取结果（当天磁盘缓存，不过期）"""
-    cache = _ensure_disk_cache()
-    if query in cache:
-        return cache[query]
-    return None
-
-
-def _set_cached(query: str, results: list[dict]) -> None:
-    """写入缓存（内存 + 磁盘）"""
-    cache = _ensure_disk_cache()
-    cache[query] = results
-    _flush_disk_cache()
-
-# 加载 .env（如果环境变量未设置）
-_env_loaded = False
-def _ensure_env():
-    global _env_loaded
-    if _env_loaded:
-        return
-    _env_loaded = True
-    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    if os.path.exists(env_path):
-        with open(env_path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
-
-_ensure_env()
-
-
-BOCHA_ENDPOINT = "https://api.bochaai.com/v1/web-search"
-
-_BOCHA_API_KEY = os.environ.get("BOCHA_API_KEY", "")
-
-
-def _get_bocha_key() -> str:
-    """获取 Bocha API key（优先环境变量）"""
-    _ensure_env()
-    return os.environ.get("BOCHA_API_KEY", "")
-
-
-def is_weekly_industry_day() -> bool:
-    """判断今天是否为行业搜索日（周一、周三,周六严格排除）"""
-    weekday = datetime.now().weekday()
-    # 周六(5)严格排除行业新闻
-    if weekday == 5:
-        return False
-    return weekday in (0, 2)  # 周一、周三
-
-
-# ── 融资频率控制（每 3 天）───────────────────────────────────
-
-def _fundraising_state_path() -> str:
-    """融资运行日期存储路径（项目根目录，全局共享）"""
-    base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-    return os.path.join(base, "fundraising_last_run.json")
-
-
-def get_last_fundraising_date() -> str:
-    """获取上次融资搜索的日期字符串，格式 YYYY-MM-DD"""
-    try:
-        with open(_fundraising_state_path(), "r") as f:
-            data = json.load(f)
-        return data.get("last_date", "")
-    except (FileNotFoundError, json.JSONDecodeError):
-        return ""
-
-
-def set_last_fundraising_date(date_str: str) -> None:
-    """保存本次融资搜索日期"""
-    path = _fundraising_state_path()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump({"last_date": date_str}, f)
-
-
-def is_fundraising_day() -> bool:
-    """判断今天是否应该运行融资专项搜索（仅周一和周三,周六严格排除）"""
-    weekday = datetime.now().weekday()
-    # 周六(5)严格排除融资新闻
-    if weekday == 5:
-        return False
-    return weekday in (0, 2)  # 0=周一, 2=周三
-
-
-def get_api_key() -> str:
-    """返回 Bocha API key"""
-    _ensure_env()
-    key = os.environ.get("BOCHA_API_KEY", "")
-    if not key:
-        raise ValueError("BOCHA_API_KEY 环境变量未设置")
-    return key
-
-
-def _search_bocha(
-    query: str,
-    api_key: str,
-    time_range: str = "day",
-    max_results: int = 5,
-) -> list[dict]:
-    """调用 Bocha API 搜索"""
-    # 强制在查询中添加 2026,确保返回最新新闻
-    if "2026" not in query:
-        query = f"{query} 2026"
-
-    freshness_map = {
-        "day": "oneDay",
-        "week": "oneWeek",
-        "month": "oneMonth",
-        "year": "oneYear",
-    }
-    freshness = freshness_map.get(time_range, "oneWeek")
-
-    payload = {
-        "query": query,
-        "freshness": freshness,
-        "summary": False,
-        "count": max_results,
-    }
-
-    resp = requests.post(
-        BOCHA_ENDPOINT,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-
-    results = []
-    pages = data.get("data", {}).get("webPages", {}).get("value", [])
-    for p in pages[:max_results]:
-        results.append({
-            "title": p.get("name", ""),
-            "url": p.get("url", ""),
-            "content": p.get("snippet", ""),
-            "score": 0.0,
-            "published_date": p.get("datePublished", ""),
-        })
-    return results
+# 从 search_core 导入共享函数
+from scripts.search_core import (
+    _get_cached, _set_cached, get_api_key, _search_bocha, BOCHA_ENDPOINT
+)
 
 
 def search_tavily(
@@ -294,7 +115,7 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     """根据品牌配置生成搜索查询列表
 
     策略：短查询 + 多角度覆盖，每条查询关键词不超过3个（Bocha 对长 OR 查询支持差）。
-    每个品牌最多 3 条查询，控制 API 消耗。
+    每个品牌最多 4 条查询（泛搜索 + site 精准搜索），控制 API 消耗。
     """
     queries = []
     name = brand_config["name"]
@@ -302,6 +123,8 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
     keywords = brand_config.get("keywords", [])
     lang = brand_config.get("lang", "zh")
     all_names = list(set(sub_brands + [name]))
+
+    # ========== 泛搜索（原有，保持不变）==========
 
     # 查询 1：品牌 + 高价值信号词（短查询，最多3个 OR）
     high_signals = [k for k in keywords if k in ("发布会", "新品", "代言人", "新车", "品牌升级", "广告", "营销")]
@@ -348,6 +171,22 @@ def build_brand_queries(brand_config: dict) -> list[dict]:
             "lang": "en",
         })
 
+    # ========== Site 精准搜索（新增）==========
+    # 获取该品牌所属行业对应的垂类媒体
+    media_sites = get_media_sites_for_brand(brand_config, max_sites=5)
+    if media_sites:
+        # 构建 site: 查询字符串
+        # 例如: "vivo site:ithome.com OR site:36kr.com OR site:huxiu.com"
+        site_part = " OR ".join(f"site:{d}" for d in media_sites)
+        queries.append({
+            "query": f'{name} {site_part}',
+            "brand": name,
+            "brand_names": all_names,
+            "type": "brand_site",
+            "lang": "zh",
+            "media_sites": media_sites,  # 附加信息，用于后续过滤
+        })
+
     return queries
 
 
@@ -380,6 +219,7 @@ _STATIC_NEWS_DOMAINS = [
     "k.sina.com.cn",
     # 汽车垂类
     "autohome.com.cn", "pcauto.com.cn", "dongchedi.com",
+    "bitauto.com", "dongqiudi.com",
     # 投融资/创投媒体
     "donews.com", "pedaily.cn", "chinaventure.com.cn",
     "itjuzi.com", "iheima.com", "cyzone.cn",
@@ -388,33 +228,46 @@ _STATIC_NEWS_DOMAINS = [
     "china.com.cn", "chinanews.com.cn",
     # 科技/消费
     "guancha.cn", "pingwest.com", "jiqizhixin.com",
+    # 补充高频域名
+    "nbd.com.cn", "tmtpost.com", "finance.sina.com.cn",
+    "finance.eastmoney.com", "news.qq.com",
+    "hupu.com", "17173.com",
 ]
 
+def _normalize_domain(domain: str) -> str:
+    """域名归一化：去除 www. 前缀，统一大小写"""
+    return domain.lower().lstrip("www.")
+
+
 def _load_dynamic_whitelist() -> list[str]:
-    """加载动态白名单（从domain_whitelist.json）"""
+    """加载动态白名单（从domain_whitelist.json），自动去除 www. 前缀"""
     whitelist_path = os.path.join(os.path.dirname(__file__), "..", "data", "domain_whitelist.json")
     if not os.path.exists(whitelist_path):
         return []
     try:
         with open(whitelist_path, "r", encoding="utf-8") as f:
             whitelist_data = json.load(f)
-            # 合并所有行业的域名
             all_domains = []
             for industry, domains in whitelist_data.items():
-                all_domains.extend(domains)
-            return list(set(all_domains))  # 去重
+                for d in domains:
+                    all_domains.append(_normalize_domain(d))
+            return list(set(all_domains))
     except Exception as e:
         print(f"  [警告] 加载动态白名单失败: {e}")
         return []
 
-# 中文新闻源域名白名单（静态 + 动态）
-ZH_NEWS_DOMAINS = _STATIC_NEWS_DOMAINS + _load_dynamic_whitelist()
+# 中文新闻源域名白名单（静态 + 动态，归一化后去重）
+_ALL_NEWS_DOMAINS_RAW = _STATIC_NEWS_DOMAINS + _load_dynamic_whitelist()
+ZH_NEWS_DOMAINS = list(set(_normalize_domain(d) for d in _ALL_NEWS_DOMAINS_RAW))
 
-# 融资新闻专用域名白名单（比品牌白名单更宽，包含创投媒体）
-ZH_FUNDRAISING_DOMAINS = ZH_NEWS_DOMAINS + [
+# 融资新闻专用域名白名单（比品牌白名单更宽，包含创投媒体，归一化）
+_EXTRA_FUNDRAISING = [
     "finance.sina.com.cn", "finance.ifeng.com",
     "chuangye.com", "vc.cn", "newseed.cn",
 ]
+ZH_FUNDRAISING_DOMAINS = list(
+    set(ZH_NEWS_DOMAINS) | set(_normalize_domain(d) for d in _EXTRA_FUNDRAISING)
+)
 
 # URL 噪音模式：匹配到的直接丢弃
 _NOISE_URL_PATTERNS = [
@@ -493,10 +346,22 @@ def _execute_query(q: dict, api_key: str, time_range: str, search_depth: str) ->
             if not any(bn and bn.lower() in text_to_check.lower() for bn in brand_names):
                 continue  # 品牌名不在标题和内容前200字中，丢弃
 
+        # ── Site 精准搜索的域名过滤 ──────────────────────────
+        # brand_site 查询结果必须来自指定的垂类媒体
+        # Bocha site: 查询虽然有限定，但结果可能包含其他域名，需要二次过滤
+        if qtype == "brand_site":
+            media_sites = q.get("media_sites", [])
+            if media_sites:
+                url_domain = _normalize_domain(urlparse(url).netloc)
+                if not any(site in url_domain or url_domain in site for site in media_sites):
+                    continue  # 不在指定媒体列表中，丢弃
+
         # ── 融资查询的域名质量过滤 ──────────────────────────
         # 融资新闻必须来自可信媒体，过滤行业报告站/SEO站
+        # 使用归一化域名匹配（去除 www. 前缀）避免误匹配
         if qtype in ("fundraising_amount", "fundraising_news", "fundraising_detail"):
-            if not any(d in url for d in ZH_FUNDRAISING_DOMAINS):
+            url_domain = _normalize_domain(urlparse(url).netloc)
+            if url_domain not in ZH_FUNDRAISING_DOMAINS:
                 continue
 
         item = {
@@ -590,6 +455,75 @@ def load_brand_industry_map() -> dict:
         return brand_map
     except Exception:
         return {}
+
+
+# ── 行业垂类媒体加载（用于 site: 精准搜索）────────────────────────
+
+_INDUSTRY_MEDIA_CACHE = None
+
+
+def load_industry_media() -> dict:
+    """
+    加载 config.yaml 中的 industry_media 配置。
+    返回: {行业名: [域名列表]}
+    """
+    global _INDUSTRY_MEDIA_CACHE
+    if _INDUSTRY_MEDIA_CACHE is not None:
+        return _INDUSTRY_MEDIA_CACHE
+
+    import yaml
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+
+        media_map = {}
+        for entry in config.get("industry_media", []):
+            industry = entry.get("industry", "")
+            domains = entry.get("domains", {})
+            if industry and domains:
+                # domains 格式: {媒体名: 域名}
+                domain_list = list(domains.values())
+                media_map[industry] = domain_list
+
+        _INDUSTRY_MEDIA_CACHE = media_map
+        return media_map
+    except Exception as e:
+        print(f"[警告] 加载 industry_media 失败: {e}")
+        return {}
+
+
+def get_media_sites_for_brand(brand_config: dict, max_sites: int = 5) -> list[str]:
+    """
+    根据品牌所属行业，返回对应的垂类媒体域名列表。
+    用于 Bocha site: 精准搜索。
+    """
+    brand_name = brand_config.get("name", "")
+    brand_industry = brand_config.get("industry", "")
+
+    media_map = load_industry_media()
+    sites = []
+
+    # 优先用品牌自己的行业
+    if brand_industry and brand_industry in media_map:
+        sites.extend(media_map[brand_industry])
+
+    # 补充泛科技媒体（所有行业都可能用到）
+    common_sites = [
+        "36kr.com", "huxiu.com", "tmtpost.com",
+        "ithome.com", "jiqizhixin.com", "zhidx.com"
+    ]
+
+    # 去重并限制数量
+    seen = set(sites)
+    for site in common_sites:
+        if site not in seen:
+            sites.append(site)
+            seen.add(site)
+            if len(sites) >= max_sites:
+                break
+
+    return sites[:max_sites]
 
 
 # ── 融资专项搜索 ──────────────────────────────────────────
@@ -743,7 +677,7 @@ def run_fundraising_search(fundraising_config: dict, api_key: str = None) -> lis
             print(f"[融资搜索失败] {q['query']}: {e}")
             return []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(_search_one, q) for q in queries]
         for future in concurrent.futures.as_completed(futures):
             all_results.extend(future.result())
@@ -769,7 +703,7 @@ def run_track_research(tracks: list[dict], include_tracks: list[str], api_key: s
             return []
 
     all_results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(_search_one, q) for q in queries]
         for future in concurrent.futures.as_completed(futures):
             all_results.extend(future.result())
@@ -832,6 +766,19 @@ def run_hybrid_search(brands: list[dict], config: dict, api_key: str = None) -> 
     print("="*60 + "\n")
 
     return unique_results
+
+
+# ── 行业搜索（向后兼容）─────────────────────────────────────
+# 注：单档案模式下的行业搜索已整合到 run_hybrid_search 中
+# 此函数保留用于兼容旧代码调用
+
+def run_industry_search(industry_configs: list) -> list[dict]:
+    """
+    行业融资新闻搜索（向后兼容函数）。
+    现在行业搜索通过 run_hybrid_search 的 shared_config['fundraising'] 配置执行。
+    此函数返回空列表，实际行业数据从共享搜索池获取。
+    """
+    return []
 
 
 # ── 信息源质量追踪 ────────────────────────────────────────

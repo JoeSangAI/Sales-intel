@@ -132,11 +132,7 @@ fundraising:
   # 搜集窗口说明：
   #   周一推送 → 覆盖上周四至周一的融资动态
   #   周四推送 → 覆盖周一至周四的融资动态
-  schedule:
-    - monday: "上周四 00:00 至 周一 08:00 的融资动态"
-    - thursday: "本周一 00:00 至 周四 08:00 的融资动态"
-
-  # 融资阶段权重：越早介入可能越大，但确定性越低
+  # 融资赛道配置
   stages:
     - seed: "种子/天使轮 - 观察期，3个月后跟进"
     - series_a: "A轮 - 产品跑通，快速扩张，立即接触"
@@ -178,6 +174,93 @@ fundraising:
     - "医疗健康（纯B端）"
     - "游戏（政策风险高）"
 
+# 行业垂类媒体配置（用于 RSS 主动抓取 + Bocha site: 精准搜索）
+industry_media:
+  # 手机3C / 消费电子
+  - industry: 手机3C
+    domains:
+      it之家: "ithome.com"
+      电子发烧友: "elecfans.com"
+      智东西: "zhidx.com"
+      雷锋网: "leiphone.com"
+
+  - industry: 消费电子
+    domains:
+      it之家: "ithome.com"
+      电子发烧友: "elecfans.com"
+      智东西: "zhidx.com"
+      雷锋网: "leiphone.com"
+
+  # 新能源汽车
+  - industry: 新能源汽车
+    domains:
+      汽车之家: "autohome.com.cn"
+      懂车帝: "dongchedi.com"
+      第一电动: "d1ev.com"
+      电车之家: "dianchijia.com"
+      新能源汽车网: "chinanev.net"
+
+  # 食品粮油 / 调味品
+  - industry: 食品粮油
+    domains:
+      食品伙伴网: "foodmate.net"
+      FoodTalks: "foodtalks.cn"
+      中国食品网: "cnfoodnet.com"
+      每日食品: "meirishipin.com"
+      新经销: "xinjingxiao.com"
+      食业头条: "shiyeheadline.com"
+
+  # 美妆护肤 / 保健品
+  - industry: 美妆护肤
+    domains:
+      聚美丽: "jumeili.cn"
+      品观网: "pinguan.com"
+      C2CC传媒: "c2cc.com.cn"
+      中国美妆网: "chinabeauty.cn"
+
+  - industry: 保健品
+    domains:
+      环球健康: "huanqq.com"
+      中国保健品新闻网: "bjspw.com"
+
+  # 机器人 / AI大模型
+  - industry: 机器人与具身智能
+    domains:
+      机器之心: "jiqizhixin.com"
+      量子位: "liangzispace.com"
+      中国机器人网: "robot-china.com"
+      智东西: "zhidx.com"
+
+  - industry: AI科技
+    domains:
+      机器之心: "jiqizhixin.com"
+      量子位: "liangzispace.com"
+      智东西: "zhidx.com"
+      人工智能日报网: "rgznrb.com"
+
+  # 智能硬件 / IoT
+  - industry: 智能硬件与IoT
+    domains:
+      OFweek智能硬件: "znyj.ofweek.com"
+      物联网智库: "iot101.com"
+      新物联: "newiot.com"
+      智东西: "zhidx.com"
+
+  # 半导体 / 芯片
+  - industry: 半导体与集成电路
+    domains:
+      芯东西: "xingdongai.com"
+      EETOP: "eetop.cn"
+      国芯网: "211ic.com"
+      半导体世界: "semiw.com"
+
+  # 企业服务 / SaaS
+  - industry: 企业服务与SaaS
+    domains:
+      牛透社: "niutoushe.com"
+      SaaS点评网: "saasruanjian.com"
+      崔牛会: "cuiniuhui.com"
+
 # 搜索配置
 search:
   bocha_api_key_env: BOCHA_API_KEY
@@ -185,9 +268,15 @@ search:
   weekly_max_credits: 30
   results_per_query: 20
   news_time_range: day
+  # Bocha site: 精准搜索配置
+  site_search:
+    enabled: true
+    # 每品牌最多 site: 查询的媒体数
+    max_sites_per_brand: 5
+    # 每媒体最多返回结果数
+    max_results_per_site: 5
 
 # 日报配置
 report:
-  schedule: "08:00"
   skip_if_empty: true
   output_format: markdown
