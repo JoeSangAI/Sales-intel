@@ -69,6 +69,22 @@ WHITELIST_SOURCES = {
         "industry": "新能源汽车",
         "rss": None,
     },
+    "chejiahao.autohome.com.cn": {
+        "name": "汽车之家自媒体",
+        "base_url": "https://chejiahao.autohome.com.cn",
+        "list_url": "https://chejiahao.autohome.com.cn",
+        "article_pattern": r'/info/\d+',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
+    "dongchedi.com": {
+        "name": "懂车帝",
+        "base_url": "https://www.dongchedi.com",
+        "list_url": "https://www.dongchedi.com",
+        "article_pattern": r'/article/\d+',
+        "industry": "新能源汽车",
+        "rss": None,
+    },
 
     # ===== 美妆护肤 =====
     "jumeili.cn": {
@@ -134,7 +150,7 @@ WHITELIST_SOURCES = {
         "rss": None,
     },
 
-    # ===== 半导体 =====
+    # ===== 科技/AI =====
     "big-bit.com": {
         "name": "大比特网",
         "base_url": "https://www.big-bit.com",
@@ -149,6 +165,14 @@ WHITELIST_SOURCES = {
         "list_url": "https://www.eetop.cn",
         "article_pattern": r'/semi/\d+\.html',
         "industry": "半导体",
+        "rss": None,
+    },
+    "techxun.com": {
+        "name": "科技讯",
+        "base_url": "http://www.techxun.com",
+        "list_url": "http://www.techxun.com",
+        "article_pattern": r'/news/it/\d+\.html',
+        "industry": "AI科技",
         "rss": None,
     },
 
@@ -166,7 +190,7 @@ WHITELIST_SOURCES = {
 
 # ── 融资/代言人信号词 ───────────────────────────────
 _BRAND_NEWS_KEYWORDS  = ["新品", "发布", "上市", "推出", "首发", "亮相", "问世",
-                          "营销", "广告", "投放", "campaign", "品牌升级", "代言人"]
+                          "营销", "广告", "投放", "campaign", "品牌升级", "代言人", "比亚迪", "特斯拉", "问界", "蔚来", "小米汽车", "理想汽车", "小鹏", "新车上市"]
 _FUNDRAISING_KEYWORDS = ["融资", "获投", "轮融资", "亿元", "投资", "上市", "IPO",
                           "收购", "并购", "估值"]
 _ENDORSEMENT_KEYWORDS = ["代言", "代言人", "品牌大使", "形象大使", "官宣"]
