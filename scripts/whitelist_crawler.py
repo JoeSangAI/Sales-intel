@@ -123,6 +123,24 @@ WHITELIST_SOURCES = {
     },
 
     # ===== 机器人 / AI =====
+    "rgznrb.com": {
+        "name": "人工智能日报网",
+        "base_url": "https://www.rgznrb.com",
+        "list_url": "https://www.rgznrb.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "AI科技",
+        "rss": None,
+    },
+
+    # ===== 智能硬件 / IoT =====
+    "newiot.com": {
+        "name": "新物联",
+        "base_url": "https://www.newiot.com",
+        "list_url": "https://www.newiot.com",
+        "article_pattern": r'/[\w/]+/\d+\.html',
+        "industry": "智能硬件",
+        "rss": None,
+    },
     "robot-china.com": {
         "name": "中国机器人网",
         "base_url": "https://www.robot-china.com",
