@@ -242,6 +242,13 @@ def _run_pipeline_inner(
             "industries": industry_configs,
             "fundraising": fundraising_config,
         })
+
+        # 跳过客户新闻（只跑行业和代言人）
+        skip_customer_news = config.get("skip_customer_news", False)
+        if skip_customer_news:
+            print("  [特殊规则] 跳过客户新闻，只保留行业和代言人")
+            all_raw = [r for r in all_raw if r.get("brand", "").startswith("[行业]")]
+
         print(f"  分发结果: {len(all_raw)} 条")
     else:
         # 独立搜索 - 使用混合搜索模式
@@ -586,16 +593,13 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
     else:
         print(f"[多档案模式] 今日跳过代言人速报（非周三）")
 
-    # Phase 2: 按档案独立处理
-    reports = []
-    for profile in profiles:
+    # Phase 2: 按档案独立处理（并发）
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _run_one_profile(profile: dict) -> tuple:
         pname = profile.get("name", "default")
-        # 设置数据目录
         set_profile(pname)
-
-        # 按行业过滤代言人
         profile_endorsements = match_endorsements_to_profile(all_endorsements, profile) if all_endorsements else []
-
         output_dir = os.path.join(DEFAULT_AI_OUTPUT_DIR, pname)
         report = run_single_profile_pipeline(
             profile_name=pname,
@@ -607,7 +611,22 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
             fundraising_results_raw=pre_fr_results if include_industry else None,
             endorsement_items=profile_endorsements,
         )
-        reports.append(report)
+        return pname, report
+
+    reports = []
+    # 最多3个档案并发跑，MiniMax API 承受得住
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = {executor.submit(_run_one_profile, profile): profile.get("name") for profile in profiles}
+        for future in as_completed(futures):
+            pname = futures[future]
+            try:
+                _, report = future.result()
+                reports.append(report)
+            except Exception as e:
+                print(f"  [档案异常] {pname}: {e}")
+                reports.append("")
+                import traceback
+                traceback.print_exc()
 
     print(f"\n[多档案模式] 完成，共处理 {len(profiles)} 个档案")
     return reports

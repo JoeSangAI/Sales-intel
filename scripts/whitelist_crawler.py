@@ -12,9 +12,11 @@ import json
 import requests
 import re
 import warnings
+import concurrent.futures
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 忽略SSL警告
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
@@ -320,6 +322,42 @@ WHITELIST_SOURCES = {
         "industry": "餐饮",
         "rss": None,
     },
+    "canyin88.com": {
+        "name": "红餐网",
+        "base_url": "https://www.canyin88.com",
+        "list_url": "https://www.canyin88.com",
+        "article_pattern": r'/zixun/\d+/\d+/\d+/\d+\.html',
+        "industry": "餐饮",
+        "rss": None,
+    },
+
+    # ===== 营销 =====
+    "digitaling.com": {
+        "name": "数英网",
+        "base_url": "https://www.digitaling.com",
+        "list_url": "https://www.digitaling.com",
+        "article_pattern": r'/(articles|projects)/\d+\.html',
+        "industry": "品牌营销",
+        "rss": "https://www.digitaling.com/rss",
+    },
+
+    "adquan.com": {
+        "name": "广告门",
+        "base_url": "https://www.adquan.com",
+        "list_url": "https://www.adquan.com",
+        "article_pattern": r'/article/\d+',
+        "industry": "品牌营销",
+        "rss": None,
+    },
+    "niaogebiji.com": {
+        "name": "鸟哥笔记",
+        "base_url": "https://www.niaogebiji.com",
+        "list_url": "https://www.niaogebiji.com",
+        "article_pattern": r'/article-\d+-\d+\.html',
+        "industry": "品牌营销",
+        "rss": None,
+    },
+
     "luxe.co": {
         "name": "华丽志",
         "base_url": "https://www.luxe.co",
@@ -684,8 +722,8 @@ def crawl_whitelist_source(domain: str, config: Dict, keywords: List[str] = None
     else:
         print(f"    首页文章 {len(articles)}")
 
-    # 精准抓取每篇文章获取摘要
-    for a in articles:
+    # 精准抓取每篇文章获取摘要（并发）
+    def _fetch_article(a: Dict) -> Dict:
         full_html = _fetch_page_content(a["url"], timeout=8)
         if full_html:
             title, content = _extract_from_html(full_html, "")
@@ -693,6 +731,11 @@ def crawl_whitelist_source(domain: str, config: Dict, keywords: List[str] = None
                 a["title"] = title
             a["content"] = content
         a["content_type"] = _classify_content_type(a.get("title", ""), a.get("content", ""))
+        return a
+
+    if articles:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            articles = list(executor.map(_fetch_article, articles))
 
     print(f"    最终: {len(articles)} 篇")
     return articles
@@ -700,19 +743,31 @@ def crawl_whitelist_source(domain: str, config: Dict, keywords: List[str] = None
 
 def crawl_all_whitelist_sources(industry_keywords: Dict = None,
                                  brand_keywords: List[str] = None) -> List[Dict]:
-    """抓取所有精确配置的垂类媒体"""
-    all_articles = []
+    """抓取所有精确配置的垂类媒体（域名级并发）"""
 
-    for domain, config in WHITELIST_SOURCES.items():
+    def _crawl_one(domain: str, config: Dict) -> List[Dict]:
         industry = config.get("industry", "")
         keywords = list(brand_keywords) if brand_keywords else []
         if industry_keywords and industry in industry_keywords:
             keywords.extend(industry_keywords[industry])
-
         articles = crawl_whitelist_source(domain, config, keywords)
         for a in articles:
             a["industry"] = industry
-        all_articles.extend(articles)
+        return articles
+
+    all_articles = []
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {
+            executor.submit(_crawl_one, domain, config): domain
+            for domain, config in WHITELIST_SOURCES.items()
+        }
+        for future in as_completed(futures):
+            domain = futures[future]
+            try:
+                articles = future.result()
+                all_articles.extend(articles)
+            except Exception as e:
+                print(f"    [域名异常] {domain}: {e}")
 
     return all_articles
 
@@ -726,130 +781,6 @@ _BOCHA_SITE_TOP_DOMAINS = [  # 只对这些高价值域名做 site: 查询
 ]
 _BOCHA_SITE_CACHE_KEY_PREFIX = "site:"  # 缓存 key 前缀，site: 查询走独立缓存池
 
-
-def crawl_via_bocha_site_search(
-    domains: List[str],
-    keywords: List[str],
-    api_key: str,
-    max_per_domain: int = 5,
-) -> List[Dict]:
-    """
-    Bocha site: 辅助抓取（资源受限版）。
-
-    策略：只对 Top 8 高价值域名做 site: 查询，且严格限制总调用量。
-    所有 site: 查询结果走独立缓存，避免重复消耗 API credits。
-
-    domains: 白名单域名列表（仅作参考，实际只用 TOP_DOMAINS）
-    keywords: 关键词列表（取前 5 个最相关的）
-    api_key: Bocha API key
-    max_per_domain: 每域名最多抓取的文章数
-    """
-    from scripts.search_core import _get_cached, _set_cached
-
-    results = []
-    seen_urls = set()
-
-    # 只处理 Top 高价值域名
-    target_domains = [d for d in _BOCHA_SITE_TOP_DOMAINS if d in domains]
-    if not target_domains:
-        # 兜底：从 domains 中取前 3 个
-        target_domains = domains[:3]
-
-    # 取最相关的关键词（取前 5 个）
-    top_keywords = keywords[:5]
-
-    # 预计算总查询量，超过上限则采样
-    total_queries = len(target_domains) * len(top_keywords)
-    if total_queries > _BOCHA_SITE_QUERY_LIMIT:
-        # 按域名采样：每个域名取最相关的 2-3 个关键词
-        queries_per_domain = max(2, _BOCHA_SITE_QUERY_LIMIT // len(target_domains))
-        top_keywords = keywords[:queries_per_domain * len(target_domains)][:queries_per_domain]
-
-    print(f"  [Bocha辅助] 目标域名: {target_domains}")
-    print(f"  [Bocha辅助] 关键词: {top_keywords}")
-    print(f"  [Bocha辅助] 预计查询: {len(target_domains) * len(top_keywords)} 次（上限 {_BOCHA_SITE_QUERY_LIMIT}）")
-
-    bocha_calls = 0
-
-    for domain in target_domains:
-        domain_lower = domain.lower()
-        if bocha_calls >= _BOCHA_SITE_QUERY_LIMIT:
-            print(f"  [Bocha辅助] 达到查询上限 {_BOCHA_SITE_QUERY_LIMIT}，停止")
-            break
-
-        domain_articles = 0
-
-        for kw in top_keywords:
-            if bocha_calls >= _BOCHA_SITE_QUERY_LIMIT:
-                break
-            if domain_articles >= max_per_domain:
-                break
-
-            cache_key = f"site:{domain}:{kw}"
-            cached = _get_cached(cache_key)
-            if cached is not None:
-                bocha_results = cached
-                print(f"  [Bocha辅助] {domain} '{kw}': 缓存命中 {len(bocha_results)} 条")
-            else:
-                bocha_calls += 1
-                query = f"site:{domain} {kw} 2026"
-                try:
-                    bocha_results = search_tavily(
-                        query=query,
-                        api_key=api_key,
-                        time_range="month",
-                        max_results=8,
-                    )
-                    _set_cached(cache_key, bocha_results)
-                    print(f"  [Bocha辅助] {domain} '{kw}': {len(bocha_results)} 条（#{bocha_calls}）")
-                except Exception as e:
-                    print(f"  [Bocha辅助] {domain} '{kw}': 查询失败 {e}")
-                    bocha_results = []
-
-            for r in bocha_results:
-                url = r.get("url", "")
-                if not url or domain_lower not in url.lower():
-                    continue
-                if url in seen_urls:
-                    continue
-                seen_urls.add(url)
-
-                # 直接抓取真实文章 URL
-                html = _fetch_page_content(url, timeout=8)
-                if not html:
-                    # 回退：使用 Bocha 返回的标题和摘要
-                    title = r.get("title", "")
-                    content = r.get("content", "")
-                else:
-                    title, content = _extract_from_html(html, kw)
-                    if not title:
-                        title = r.get("title", "")
-
-                if not title or len(title) < 5:
-                    continue
-
-                # 关键词二次校验
-                text = (title + " " + content).lower()
-                if kw.lower() not in text:
-                    continue
-
-                content_type = _classify_content_type(title, content)
-                results.append({
-                    "title": title,
-                    "url": url,
-                    "content": content or r.get("content", ""),
-                    "source": "whitelist_crawler",
-                    "content_type": content_type,
-                })
-                domain_articles += 1
-
-                if domain_articles >= max_per_domain:
-                    break
-
-        print(f"  [Bocha辅助] {domain}: 抓取 {domain_articles} 篇（累计 {len(results)} 篇）")
-
-    print(f"  [Bocha辅助] 实际 Bocha 调用: {bocha_calls} 次（上限 {_BOCHA_SITE_QUERY_LIMIT}）")
-    return results
 
 
 def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None,
@@ -920,16 +851,8 @@ def run_whitelist_crawl(config: Dict, profile_brands: List[str] = None,
 
     print(f"  动态域名: {len(dynamic_domains)} 个（如已有精确配置则跳过）")
 
-    if dynamic_domains and all_keywords and bocha_api_key:
-        articles_2 = crawl_via_bocha_site_search(
-            domains=dynamic_domains,
-            keywords=all_keywords,
-            api_key=bocha_api_key,
-            max_per_domain=_BOCHA_SITE_MAX_PER_DOMAIN,
-        )
-    else:
-        print("  跳过（无 API key 或无关键词）")
-        articles_2 = []
+    print("  [Bocha辅助] 已禁用（Bocha site 辅助抓取已移除）")
+    articles_2 = []
 
     # ── 合并去重 ────────────────────────────────────
     all_articles = articles_1 + articles_2
