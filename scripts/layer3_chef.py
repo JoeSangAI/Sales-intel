@@ -3,54 +3,25 @@ Layer 3 - 大厨 LLM 模块
 通盘看完所有原材料，直接生成完整 Markdown 报告
 """
 
-import json
 import os
+import re
 import sys
-import requests
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
+
+from scripts.minimax_client import call_minimax
 
 
 # ── MiniMax API 调用 ────────────────────────────────────────────
 
 def _call_llm(prompt: str, timeout: int = 180, max_tokens: int = 8000) -> str:
     """调用 MiniMax M2.7，返回原始文本内容"""
-    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
-    if not minimax_key:
-        print("  [Chef 警告] MINIMAX_API_KEY 未设置")
-        return ""
-    for attempt in range(3):
-        try:
-            resp = requests.post(
-                "https://api.minimax.chat/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {minimax_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "MiniMax-M2.7",
-                    "max_tokens": max_tokens,
-                    "temperature": 0.3,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            choices = resp.json().get("choices", [])
-            if choices and isinstance(choices[0], dict):
-                content = choices[0].get("message", {}).get("content", "")
-            else:
-                content = ""
-            print(f"  [Chef MiniMax OK] 生成了 {len(content)} 字符", flush=True)
-            # 去掉 MiniMax 思考块
-            content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
-            return content
-        except Exception as e:
-            print(f"  [Chef MiniMax 失败{' (重试)' if attempt < 2 else ''}] {e}", flush=True)
-            if attempt < 2:
-                import time; time.sleep(3)
-    return ""
+    print(f"  [Chef] 调用 MiniMax...", flush=True)
+    content = call_minimax(prompt, timeout=timeout, max_tokens=max_tokens, retries=3)
+    if content:
+        print(f"  [Chef MiniMax OK] 生成了 {len(content)} 字符", flush=True)
+    return content
 
 
 # ── Prompt 构建 ─────────────────────────────────────────────────
@@ -153,22 +124,58 @@ def _build_chef_prompt(items: list[dict], config: dict, schedule: dict,
 {'【代言人速报】' if end_lines else ''}
 {chr(10).join(end_lines) if end_lines else ''}
 
-你的输出要求：
-1. 客户新闻：按品牌分组，🔴标签留给最值得本周行动的事件
-2. 每个品牌只呈现最重要的事件，不要罗列
-3. 融资速报：按赛道分组，先汇总表再详情
-4. 代言人人报（周三专属）：按行业分组
-5. 关键引用必须标注来源 URL（幻觉是严重问题）
-6. 如果某品牌今天无重要新闻，直接标注"暂无动态"
-7. 创意切入建议：有真正好点子才写，不要为了有建议而写
+【格式强制要求】
+报告必须严格遵循以下格式，不要做任何改动：
 
-🔴 紧迫度只保留这一档，判断标准：
-- 发布会/活动在 2 周内
-- 融资刚刚宣布（1 个月内）
-- CMO/市场负责人刚换
-- 重大政策节点（如补贴窗口期）
+# 销售情报日报
 
-直接输出 Markdown 报告，不要有前缀文字。"""
+## 📋 客户新闻
+
+### 【品牌名】
+
+#### 🔴 本周跟进
+- **{{事件标题}}**（来源 · 日期）
+  一句话描述
+  来源：[媒体名](链接)
+  💡 **为什么现在跟**: 理由
+  🎨 **分众机会**: 切入点
+
+（若无本周跟进事件，写"暂无动态"）
+
+### 【品牌名】
+...
+
+## 💰 融资速报（如有）
+
+| 赛道 | 品牌 | 融资概况 | 紧迫度 |
+|------|------|----------|--------|
+| AI大模型 | 深度求索 | B轮 · 10亿 | 🔴 |
+
+### 【赛道名】
+
+#### 🔴 本周跟进
+- **{{品牌}}完成{{轮次}}融资**（日期）
+  一句话描述
+  💡 **为什么现在跟**: 理由
+  🎨 **分众机会**: 切入点
+  来源：[链接](链接)
+
+---
+*由销售情报助手生成*
+
+【格式规则】
+1. 报告必须以 `# 销售情报日报` 开头
+2. 必须包含 `## 📋 客户新闻` 一级标题
+3. 客户新闻下按品牌分，每个品牌用 `### 品牌名`
+4. 每个品牌下必须有 `#### 🔴 本周跟进` 或标注"暂无动态"
+5. 必须有 `---` 分隔符和 `*由销售情报助手生成*` 页脚
+6. 直接输出 Markdown 报告，不要有前缀文字。
+7. **来源链接必须在事件一句话描述后立即给出**，格式为 `来源：[媒体名](链接)`，不能放在分析段落之后。
+8. **每条事件必须有来源链接**，不允许有无链接的事件描述。
+9. **没有来源链接的内容不得出现在报告中**。
+10. **客户新闻 section 只能出现【今日配置】中注册的品牌**，禁止将其他品牌（如行业文章中提及的非注册品牌）写入客户新闻。
+11. **融资速报 section 只能出现【今日配置】中注册的赛道**，禁止将其他赛道的融资条目写入报告。
+12. **行业/赛道融资条目不得混入客户新闻 section**。"""
     return prompt
 
 

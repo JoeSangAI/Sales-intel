@@ -102,12 +102,13 @@ def save_seen_events(events: list[dict]):
         json.dump(events, f, ensure_ascii=False, indent=2)
 
 
-def get_recent_events_for_brand(brand: str, max_age_days: int = 14) -> list[str]:
+def get_recent_events_for_brand(brand: str, max_age_days: int = 14) -> list[dict]:
     """获取某品牌近期已推过的事件关键词列表"""
     events = load_seen_events()
     cutoff = (datetime.now() - timedelta(days=max_age_days)).strftime("%Y-%m-%d")
     return [
-        e["event_key"] for e in events
+        {"brand": e.get("brand", ""), "event_key": e.get("event_key", "")}
+        for e in events
         if e.get("brand") == brand and e.get("date", "") >= cutoff
     ]
 

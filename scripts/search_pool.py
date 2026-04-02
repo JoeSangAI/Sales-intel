@@ -215,6 +215,16 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
                 if profile_tracks and track:
                     # 精确匹配或模糊匹配
                     if track in profile_tracks or any(t in track or track in t for t in profile_tracks):
+                        # AI 公司不能出现在非 AI 赛道（防止跨行业污染）
+                        title = item.get("title", "")
+                        ai_keywords = ["openai", "深度求索", "deepseek", "通义千问",
+                                        "豆包", "文心", "kimi", "月之暗面", "智谱",
+                                        "百川", "零一万物", "阶跃星辰", "元象"]
+                        is_ai_company = any(kw in title.lower() for kw in ai_keywords)
+                        non_ai_tracks = ["日用洗护", "消费品", "休闲食品", "儿童服饰",
+                                         "家居用品", "服装", "美妆", "护肤"]
+                        if is_ai_company and track in non_ai_tracks:
+                            continue  # AI 公司被错误标到非 AI 赛道，跳过
                         results.append(item)
                 continue
 

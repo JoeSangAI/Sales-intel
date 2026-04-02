@@ -6,49 +6,18 @@ import json
 import re
 import os
 import sys
-import requests
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
+
+from scripts.minimax_client import call_minimax
 
 
 # ── MiniMax API 调用 ────────────────────────────────────────────
 
 def _call_qc_llm(prompt: str, timeout: int = 120, max_tokens: int = 2000) -> str:
     """调用 MiniMax M2.7 进行质检"""
-    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
-    if not minimax_key:
-        print("  [QC 警告] MINIMAX_API_KEY 未设置")
-        return ""
-    for attempt in range(2):
-        try:
-            resp = requests.post(
-                "https://api.minimax.chat/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {minimax_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "MiniMax-M2.7",
-                    "max_tokens": max_tokens,
-                    "temperature": 0.1,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            choices = resp.json().get("choices", [])
-            if choices and isinstance(choices[0], dict):
-                content = choices[0].get("message", {}).get("content", "")
-            else:
-                content = ""
-            print(f"  [QC MiniMax OK]", flush=True)
-            return content
-        except Exception as e:
-            print(f"  [QC MiniMax 失败{' (重试)' if attempt < 1 else ''}] {e}", flush=True)
-            if attempt < 1:
-                import time; time.sleep(2)
-    return ""
+    return call_minimax(prompt, timeout=timeout, max_tokens=max_tokens, retries=3)
 
 
 # ── 质检 Prompt ─────────────────────────────────────────────────
@@ -61,12 +30,15 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
         title = item.get("title", "")
         url = item.get("url", "")
         content = item.get("content", "")[:600]
+        brand = item.get("brand", "")
         item_lines.append(
-            f"[{i}] title={title}\n    url={url}\n    content={content}"
+            f"[{i}] brand={brand}\n    title={title}\n    url={url}\n    content={content}"
         )
 
     # 提取报告中所有 URL
     report_urls = re.findall(r'https?://[^\s\)\]]+', report)
+    # 提取报告中出现的公司/品牌名
+    brand_names_in_report = re.findall(r'### 【(.+?)】', report)
 
     prompt = f"""你是质检员，检查以下销售日报是否存在以下问题：
 
@@ -75,13 +47,20 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
 - 是否有板块结构（## 标题）？
 - 是否有链接（[xxx](url) 格式）？
 - 是否有日期？
+- **每条事件是否都有来源链接？来源链接是否紧跟在事件描述之后？**
 
 【幻觉检查——最重要】
-日报中每个 [xxx](url) 的 url，必须真实存在于原始新闻列表中。
-日报中提到的关键数字/日期，必须出现在对应的原始新闻内容中。
+1. **URL 检查**：日报中每个 [xxx](url) 的 url，必须真实存在于原始新闻列表中
+2. **无链接内容检查**：报告中任何没有URL的事件描述、或放在"来源：[媒体名](链接)"之前的分析段落，都是严重幻觉
+3. **品牌存在性检查**：报告中出现的公司/品牌名（如 {"、".join(brand_names_in_report[:10])}），必须能在原始新闻列表的 brand 或 title 字段中找到真实对应
+4. **赛道合理性检查**：报告中融资条目被归入的赛道，必须与该品牌的实际业务匹配（如 OpenAI 不应出现在"日用洗护"、"消费品"等赛道）
+5. **数字/日期检查**：报告中提到的关键数字、日期，必须出现在对应原始新闻内容中
 
 报告中的 URL（共 {len(report_urls)} 个）:
 {chr(10).join(report_urls[:50]) if report_urls else "（无URL）"}
+
+报告中的品牌章节（共 {len(brand_names_in_report)} 个）:
+{chr(10).join(brand_names_in_report) if brand_names_in_report else "（无品牌章节）"}
 
 【日报内容】
 {report}
@@ -94,14 +73,14 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
   "format_ok": true/false,
   "format_issues": ["问题1", ...],
   "hallucination_ok": true/false,
-  "hallucination_issues": ["URL xxx 不在原始新闻中", ...],
+  "hallucination_issues": ["URL xxx 不在原始新闻中", "品牌 XXX 在原始数据中不存在", "XXX 出现在不合理的赛道YYY", ...],
   "pass": true/false
 }}
 
 规则：
 - 只要有任何 hallucination 问题，pass=false
 - 格式问题不阻断，但仍需记录
-"""
+- 无链接的事件描述（如"暂无动态"除外）必须被标记为幻觉"""
     return prompt
 
 

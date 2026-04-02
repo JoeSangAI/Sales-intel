@@ -7,12 +7,12 @@ import json
 import re
 import os
 import sys
-import requests
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 from scripts.dedup import deduplicate, _normalize_url, _normalize_title
+from scripts.minimax_client import call_minimax
 
 
 # ── 噪音域名过滤 ────────────────────────────────────────────────
@@ -116,41 +116,9 @@ def _separate_by_type(results: list[dict]) -> tuple[list[dict], list[dict]]:
 
 # ── MiniMax API 调用 ────────────────────────────────────────────
 
-def _call_minimax_raw(prompt: str, timeout: int = 120, max_tokens: int = 4000, retries: int = 2) -> str:
+def _call_minimax_raw(prompt: str, timeout: int = 120, max_tokens: int = 4000, retries: int = 3) -> str:
     """调用 MiniMax M2.7，返回原始文本内容"""
-    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
-    if not minimax_key:
-        print("  [Layer2 警告] MINIMAX_API_KEY 未设置，跳过 LLM 分类")
-        return ""
-    for attempt in range(retries + 1):
-        try:
-            resp = requests.post(
-                "https://api.minimax.chat/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {minimax_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "MiniMax-M2.7",
-                    "max_tokens": max_tokens,
-                    "temperature": 0.3,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            choices = resp.json().get("choices", [])
-            if choices and isinstance(choices[0], dict):
-                content = choices[0].get("message", {}).get("content", "")
-            else:
-                content = ""
-            print(f"  [Layer2 MiniMax OK]", flush=True)
-            return content
-        except Exception as e:
-            print(f"  [Layer2 MiniMax 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
-            if attempt < retries:
-                import time; time.sleep(2)
-    return ""
+    return call_minimax(prompt, timeout=timeout, max_tokens=max_tokens, retries=retries)
 
 
 # ── Prompt 构建与解析 ──────────────────────────────────────────
