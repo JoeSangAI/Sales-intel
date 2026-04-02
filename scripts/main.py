@@ -18,6 +18,7 @@ import argparse
 import subprocess
 import tempfile
 import re
+import traceback
 from datetime import datetime
 
 # 添加项目根目录到 path
@@ -625,7 +626,6 @@ def run_multi_profile_pipeline(profile_names: list = None, dry_run: bool = False
             except Exception as e:
                 print(f"  [档案异常] {pname}: {e}")
                 reports.append("")
-                import traceback
                 traceback.print_exc()
 
     print(f"\n[多档案模式] 完成，共处理 {len(profiles)} 个档案")

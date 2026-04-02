@@ -11,6 +11,12 @@ import requests
 from datetime import datetime
 from typing import Optional
 
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
+import sys
+sys.path.insert(0, PROJECT_ROOT)
+
+from scripts.minimax_client import call_minimax
+
 # Playwright for Chrome CDP (绕过反爬)
 try:
     from playwright.sync_api import sync_playwright
@@ -559,21 +565,9 @@ def parse_endorsements_from_text(article_text: str, all_industries: list[str]) -
 只输出 JSON 数组，不要其他内容。"""
 
     try:
-        resp = requests.post(
-            "https://api.minimax.chat/v1/chat/completions",
-            headers={"Authorization": f"Bearer {minimax_key}", "Content-Type": "application/json"},
-            json={
-                "model": "MiniMax-M2.7",
-                "max_tokens": 2000,
-                "temperature": 0.3,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=40,
-        )
-        resp.raise_for_status()
-        content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-        # 过滤 <think> 块
-        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+        content = call_minimax(prompt, timeout=40, max_tokens=2000, retries=3)
+        if not content:
+            return []
         start = content.find("[")
         end = content.rfind("]")
         if start != -1 and end != -1:
@@ -582,7 +576,6 @@ def parse_endorsements_from_text(article_text: str, all_industries: list[str]) -
     except Exception as e:
         print(f"  [代言人解析失败] {e}")
         return []
-
 
 def match_endorsements_to_profile(endorsements: list[dict], profile: dict) -> list[dict]:
     """将代言人列表过滤出该档案关注的行业"""

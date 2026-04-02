@@ -12,7 +12,6 @@ import json
 import requests
 import re
 import warnings
-import concurrent.futures
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 from datetime import datetime
