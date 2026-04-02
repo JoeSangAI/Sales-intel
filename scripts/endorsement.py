@@ -73,7 +73,7 @@ def _save_cache(data: list[dict]) -> None:
 # 代言人来源配置
 # 中国广告协会代言人周报 - 每周一更新，最权威来源
 # 每周通过 Bocha 搜索找到最新一期微信文章 URL
-ENDORSEMENT_WECHAT_FIXED_URL = "https://mp.weixin.qq.com/s/tjNVeiGUJNIeAKxc1XvZdA"
+ENDORSEMENT_WECHAT_FIXED_URL = "https://mp.weixin.qq.com/s/0MDUpdPy0sXdu2pLN1qPfA"
 
 
 def _search_latest_wechat_article() -> Optional[str]:
@@ -494,6 +494,41 @@ def fetch_wechat_article_via_bocha(url: str) -> str:
         return ""
 
 
+def _search_endorsement_news_via_bocha() -> str:
+    """Bocha 搜索多条代言人新闻，拼接为富文本供 AI 解析。
+    当 Playwright 抓取微信文章失败时，用此方法作为备用。
+    """
+    from scripts.search import get_api_key
+    try:
+        api_key = get_api_key()
+        queries = [
+            "品牌代言人 官宣 2026",
+            "明星代言 品牌大使 官宣",
+            "中广协 代言人周报",
+        ]
+        all_parts = []
+        for q in queries:
+            resp = requests.post(
+                "https://api.bochaai.com/v1/web-search",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"query": q, "freshness": "week", "summary": True, "count": 10},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            pages = resp.json().get("data", {}).get("webPages", {}).get("value", [])
+            for p in pages:
+                title = p.get("name", "")
+                snippet = p.get("snippet", "")
+                if any(kw in title + snippet for kw in ["代言", "品牌大使", "品牌挚友", "形象大使", "官宣"]):
+                    all_parts.append(f"标题：{title}\n内容：{snippet}")
+        if all_parts:
+            print(f"  [代言人搜索] Bocha 找到 {len(all_parts)} 条代言相关新闻")
+        return "\n\n---\n\n".join(all_parts)
+    except Exception as e:
+        print(f"  [代言人搜索失败] {e}")
+        return ""
+
+
 def parse_endorsements_from_text(article_text: str, all_industries: list[str]) -> list[dict]:
     """用 MiniMax 从文章中解析代言人信息并匹配行业"""
     import os as _os
@@ -566,35 +601,63 @@ def match_endorsements_to_profile(endorsements: list[dict], profile: dict) -> li
 
 def prompt_and_fetch_endorsements(profiles: list[dict]) -> list[dict]:
     """
-    周三交互流程：
-    1. 提示用户粘贴微信链接
-    2. 用 Bocha 抓取内容
-    3. 用 MiniMax 解析代言人
+    代言人获取流程：
+    1. 检查本周缓存
+    2. Playwright 抓取微信文章全文（最佳）
+    3. Bocha 搜索多条代言新闻拼接（备用）
+    4. MiniMax 解析代言人
     返回全量代言人列表（未按档案过滤）
     """
+    import sys
+
     # 先检查本周缓存
     cached = _load_cache()
     if cached:
         print(f"  [代言人] 使用本周缓存，共 {len(cached)} 条")
         return cached
 
-    print("\n" + "="*60)
-    print("📋 今天是周三，需要录入本周代言人信息")
-    print("请粘贴微信文章链接（直接回车跳过）：")
-    print("="*60)
+    # 确定文章 URL
+    if not sys.stdin.isatty():
+        url = ENDORSEMENT_WECHAT_FIXED_URL
+        print(f"\n  [代言人] 非交互式环境，自动使用固定 URL: {url[:60]}...")
+    else:
+        print("\n" + "="*60)
+        print("📋 今天是周三，需要录入本周代言人信息")
+        print("请粘贴微信文章链接（直接回车跳过）：")
+        print("="*60)
+        url = input("> ").strip()
+        if not url:
+            print("  [代言人] 已跳过")
+            return []
 
-    url = input("> ").strip()
-    if not url:
-        print("  [代言人] 已跳过")
-        return []
+    # 策略1: Playwright 抓取全文（内容最完整）
+    article_text = ""
+    if PLAYWRIGHT_AVAILABLE:
+        print(f"  [代言人] Playwright 抓取: {url[:60]}...")
+        html = _fetch_with_chrome(url, timeout=30000)
+        if html:
+            parsed = _parse_wechat_page(html, url)
+            if parsed and parsed.get("content"):
+                article_text = parsed["content"]
+                print(f"  [代言人] Playwright 抓取成功，内容长度: {len(article_text)}")
 
-    print(f"  [代言人] 正在抓取: {url[:60]}...")
-    article_text = fetch_wechat_article_via_bocha(url)
+    # 策略2: Bocha 抓取单篇（摘要级别）
     if not article_text:
-        print("  [代言人] 抓取失败，已跳过")
+        print(f"  [代言人] Playwright 未获取到内容，尝试 Bocha 抓取...")
+        article_text = fetch_wechat_article_via_bocha(url)
+
+    # 策略3: Bocha 搜索多条代言新闻拼接
+    if not article_text or len(article_text) < 200:
+        print(f"  [代言人] 单篇内容不足，搜索多条代言新闻补充...")
+        search_text = _search_endorsement_news_via_bocha()
+        if search_text:
+            article_text = (article_text + "\n\n---\n\n" + search_text).strip()
+
+    if not article_text:
+        print("  [代言人] 所有抓取方式均失败，已跳过")
         return []
 
-    print(f"  [代言人] 抓取成功，正在解析...")
+    print(f"  [代言人] 最终内容长度: {len(article_text)}，正在解析...")
     all_industries = collect_all_industries(profiles)
     endorsements = parse_endorsements_from_text(article_text, all_industries)
     print(f"  [代言人] 解析完成，共 {len(endorsements)} 条")
@@ -603,111 +666,3 @@ def prompt_and_fetch_endorsements(profiles: list[dict]) -> list[dict]:
         _save_cache(endorsements)
 
     return endorsements
-    """
-    将代言人信息按行业分配到各销售档案
-
-    profiles: 档案配置列表，每个包含 name, industries 等字段
-    industries 格式: [{"name": "新能源汽车"}, ...] 或 ["新能源汽车", ...]
-    返回: {profile_name: [endorsements]}
-    """
-    result = {}
-
-    for profile in profiles:
-        profile_name = profile.get("name", "")
-        profile_industries = profile.get("industries", [])
-
-        if not profile_industries:
-            # 如果档案没指定行业，跳过
-            continue
-
-        # 提取行业名称列表
-        industry_names = []
-        for ind in profile_industries:
-            if isinstance(ind, dict):
-                industry_names.append(ind.get("name", ""))
-            else:
-                industry_names.append(str(ind))
-
-        # 匹配该档案关注的行业
-        matched = []
-        for e in endorsements:
-            industry = e.get("industry", "")
-            # 模糊匹配
-            if any(
-                ind.lower() in industry.lower() or industry.lower() in ind.lower()
-                for ind in industry_names
-                if ind
-            ):
-                matched.append(e)
-
-        if matched:
-            result[profile_name] = matched
-
-    return result
-
-
-def run_endorsement_pipeline(
-    llm_call_fn,
-    target_industries: list[str] = None,
-    profiles: list[dict] = None,
-) -> dict:
-    """
-    执行代言人 Pipeline
-
-    返回: {
-        "endorsements": [...],  # 所有代言人信息（含分析结果）
-        "by_profile": {...},    # 按档案分配的结果
-        "article": {...}        # 原始文章信息
-    }
-    """
-    print("  [代言人] 开始获取...")
-
-    # 1. 获取文章
-    article = fetch_latest_endorsement_article()
-    if not article:
-        print("  [代言人] 获取文章失败")
-        return {"endorsements": [], "by_profile": {}, "article": None}
-
-    # 2. 用 AI 提取结构化信息
-    items = article.get("items", [])
-    if not items:
-        items = parse_endorsement_with_ai(article, llm_call_fn)
-
-    if not items:
-        print("  [代言人] 解析代言人信息失败")
-        return {"endorsements": [], "by_profile": {}, "article": article}
-
-    print(f"  [代言人] 提取到 {len(items)} 条代言人信息")
-
-    # 3. 用 AI 分析每条代言人的分众机会
-    analyzed_items = []
-    for item in items:
-        analysis = analyze_endorsement(item, llm_call_fn)
-        item.update(analysis)
-        analyzed_items.append(item)
-
-    # 4. 保存缓存
-    _save_cache(analyzed_items)
-
-    # 5. 匹配行业
-    for item in analyzed_items:
-        item["industry"] = match_industry(item)
-
-    # 6. 按行业过滤
-    if target_industries:
-        filtered = filter_by_industry(analyzed_items, target_industries)
-    else:
-        filtered = analyzed_items
-
-    print(f"  [代言人] 匹配行业 {len(filtered)} 条")
-
-    # 7. 按档案分配
-    by_profile = {}
-    if profiles:
-        by_profile = distribute_to_profiles(filtered, profiles)
-
-    return {
-        "endorsements": filtered,
-        "by_profile": by_profile,
-        "article": article
-    }

@@ -1,12 +1,13 @@
 """
 销售情报助手 - 主入口
-orchestrates: search → dedup → analyze → report
+架构：search → dedup → layer2_preprocess → layer3_chef → quality_check
 
 板块划分：
 - 调度层 (scheduler.py): 周规则判断、profile 加载
 - 采集层 (search.py / search_pool.py): 搜索执行、结果收集
-- 分析层 (analyzer.py / dedup.py / report.py): AI 分析、去重、生成
-- 质量层 (review_agent.py): 日报自动 review
+- 预处理层 (layer2_preprocessor.py): 规则粗筛 + LLM 分类标引
+- 报告层 (layer3_chef.py): 大厨 LLM 生成完整日报
+- 质检层 (quality_check.py): 幻觉检测 + 格式质检
 """
 
 import os
@@ -16,9 +17,7 @@ import yaml
 import argparse
 import subprocess
 import tempfile
-import concurrent.futures
 import re
-import requests
 from datetime import datetime
 
 # 添加项目根目录到 path
@@ -113,13 +112,10 @@ from scripts.search import (
     run_hybrid_search,
 )
 from scripts.profile_context import set_profile, get_profile
-from scripts.dedup import deduplicate
-from scripts.analyzer import (
-    build_analysis_prompt, build_industry_prompt,
-    parse_analysis_response, filter_by_score,
-    build_fundraising_prompt, parse_fundraising_response,
-)
-from scripts.report import generate_report, generate_full_report
+from scripts.dedup import deduplicate, dedup_fundraising_by_company, _normalize_title
+from scripts.layer2_preprocessor import preprocess
+from scripts.layer3_chef import chef_report
+from scripts.quality_check import quality_check, retry_with_feedback
 from scripts.memory import (
     record_interaction, record_feedback, content_hash_from_result,
 )
@@ -136,413 +132,6 @@ from scripts.scheduler import (
     load_config, load_profiles, get_schedule_flags,
     _merge_config_with_profile,
 )
-
-
-# ── 低质量来源过滤 ─────────────────────────────────────────
-# 已知低质量 URL patterns（贴吧、论坛等）
-# 注意：sohu 的新闻和论坛 URL 格式相似，难以区分，暂不过滤
-_LOW_QUALITY_URL_PATTERNS = [
-    r'tieba\.baidu\.com',          # 百度贴吧
-    r'bbs\.',                       # 论坛 subdomain
-    r'forum\.',                     # 论坛 subdomain
-    r'club\.',                      # 论坛/社区
-]
-
-# 已知高质量媒体（来自 whitelist_crawler 的 WHITELIST_SOURCES）
-_HIGH_QUALITY_DOMAINS = {
-    "ithome.com", "elecfans.com", "leiphone.com", "cheshi.com", "d1ev.com",
-    "chejiahao.autohome.com.cn", "dongchedi.com", "jumeili.cn", "pinguan.com",
-    "chinabeauty.cn", "news.foodmate.net", "rgznrb.com", "newiot.com",
-    "nev.cn", "robot-china.com", "zhidx.com", "semiw.com", "iotworld.com.cn",
-    "big-bit.com", "eetop.cn", "techxun.com", "saasruanjian.com", "stcn.com",
-    "tmtpost.com", "niutoushe.com", "ifanr.com", "sspai.com", "cyzone.cn",
-    "36kr.com", "qianzhan.com", "meihua.info", "jiemodui.com", "canyinj.com",
-    "luxe.co",
-}
-
-
-def _is_low_quality_url(url: str) -> bool:
-    """判断 URL 是否为低质量来源（论坛、贴吧等）"""
-    if not url:
-        return False
-    import re
-    for pattern in _LOW_QUALITY_URL_PATTERNS:
-        if re.search(pattern, url, re.IGNORECASE):
-            return True
-    return False
-
-
-def _filter_by_source_quality(results: list[dict]) -> list[dict]:
-    """
-    按来源质量过滤结果。
-
-    过滤规则：
-    1. 来自 whitelist 的媒体优先保留
-    2. 来自已知低质量 URL（论坛、贴吧）的直接过滤
-    3. 新闻类 URL（news.qq.com, finance.sina.com.cn 等）保留
-    4. 其他来源按 source 名称判断：太短或太模糊的降权
-    """
-    from urllib.parse import urlparse
-
-    # 新闻类高质量域名白名单
-    NEWS_DOMAINS = {
-        "36kr.com", "jiemian.com", "thepaper.cn", "caixin.com", "eeo.com.cn",
-        "yicai.com", "nbd.com.cn", "finance.sina.com.cn", "eastmoney.com",
-        "wallstreetcn.com", "界面新闻",
-    }
-
-    filtered = []
-    low_quality_count = 0
-
-    for r in results:
-        url = r.get("url", "")
-        source = r.get("source", "")
-
-        # 规则1: 低质量 URL 直接过滤
-        if _is_low_quality_url(url):
-            low_quality_count += 1
-            continue
-
-        # 规则2: 高质量媒体直接保留
-        parsed = urlparse(url)
-        domain = parsed.netloc.lower()
-        if domain in _HIGH_QUALITY_DOMAINS:
-            filtered.append(r)
-            continue
-
-        # 规则3: 知名新闻域名保留
-        if any(nd in domain for nd in NEWS_DOMAINS):
-            filtered.append(r)
-            continue
-
-        # 规则4: 来源名称太短或模糊的降权（但保留，因为AI可能误判）
-        # 太短：来源名 <= 2个字
-        if len(source) <= 2:
-            r = dict(r)  # copy
-            r["_low_quality_source"] = True
-            filtered.append(r)
-        else:
-            filtered.append(r)
-
-    if low_quality_count > 0:
-        print(f"  [来源过滤] 过滤 {low_quality_count} 条低质量来源")
-
-    return filtered
-
-
-def _analyze_single(r: dict, parser_fn) -> dict:
-    """对单条结果执行 AI 分析，返回带 analysis 字段的结果。
-
-    省成本策略：先用规则预判，明显低质量的（分数 <= 4）直接用规则结果，
-    不调 MiniMax，只把有潜力的结果送 AI 深度分析。
-    """
-    from scripts.dedup import get_recent_events_for_brand
-
-    brand = r.get("brand", "")
-    is_industry = brand.startswith("[行业]")
-
-    # ── 规则预判（品牌新闻）：拦截明显低质量的，省 AI 调用 ──
-    if not is_industry:
-        pre_check = _fallback_analysis(r)
-        if pre_check.get("filter") or pre_check.get("relevance_score", 0) <= 4:
-            r["analysis"] = pre_check
-            return r
-
-    if is_industry:
-        prompt = build_industry_prompt(r)
-    else:
-        recent_events = get_recent_events_for_brand(brand)
-        prompt = build_analysis_prompt(r, recent_events=recent_events)
-
-    analysis = _call_minimax(prompt, parse_analysis_response)
-
-    r["analysis"] = analysis
-    return r
-
-
-def _analyze_single_fundraising(r: dict) -> dict:
-    """对单条融资结果执行 AI 分析"""
-    track_name = r.get("track_name", "")
-    prompt = build_fundraising_prompt(r, track_name)
-
-    analysis = _call_minimax(prompt, parse_analysis_response)
-
-    r["analysis"] = analysis
-    return r
-
-
-def analyze_with_openclaw(results: list[dict], recent_events: list[str] = None) -> list[dict]:
-    """
-    使用 AI 模型批量分析新闻结果。
-
-    策略：每批 10 条新闻，一次 LLM 调用处理。
-    比逐条调用节省 90% 的 HTTP 开销，同时减少 30% token 消耗。
-    如果批量分析失败，自动降级为逐条分析。
-    """
-    from scripts.analyzer import build_batch_analysis_prompt, parse_batch_analysis_response
-
-    if not results:
-        return []
-
-    # 如果没有传入 recent_events，不传（让 batch prompt 用默认空值）
-    # 近期事件去重逻辑在 dedup.py 的 record_pushed_events 中处理
-
-    BATCH_SIZE = 10
-    analyzed = []
-    fallback_count = 0
-    batch_count = 0
-
-    for i in range(0, len(results), BATCH_SIZE):
-        batch = results[i:i + BATCH_SIZE]
-        prompt = build_batch_analysis_prompt(batch, recent_events)
-        raw = _call_minimax_raw(prompt, timeout=120, max_tokens=4000)
-        parsed = parse_batch_analysis_response(raw, batch)
-
-        if len(parsed) == len(batch):
-            # 批量成功
-            batch_count += 1
-            for item in parsed:
-                r = item["result"]
-                r["analysis"] = item["analysis"]
-                analyzed.append(r)
-        else:
-            # 批量失败，降级为逐条
-            fallback_count += len(batch)
-            for r in batch:
-                try:
-                    if r.get("brand", "").startswith("[行业]"):
-                        prompt_s = build_industry_prompt(r)
-                    else:
-                        prompt_s = build_analysis_prompt(r, None)
-                    analysis = _call_minimax(prompt_s, parse_analysis_response)
-                    r["analysis"] = analysis
-                except Exception as e:
-                    print(f"  [分析失败] {r.get('title', '')[:40]}: {e}", flush=True)
-                    r["analysis"] = {"filter": True, "filter_reason": f"分析异常: {e}"}
-                analyzed.append(r)
-
-    if batch_count > 0:
-        print(f"  [批量分析] {batch_count} 批成功，{fallback_count} 条降级为逐条", flush=True)
-    return analyzed
-
-
-def _call_minimax_raw(prompt: str, timeout: int = 120, max_tokens: int = 4000, retries: int = 2) -> str:
-    """调用 MiniMax，返回原始文本内容（不解析）"""
-    minimax_key = os.environ.get("MINIMAX_API_KEY", "")
-    if not minimax_key:
-        return ""
-    for attempt in range(retries + 1):
-        try:
-            resp = requests.post(
-                "https://api.minimax.chat/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {minimax_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "MiniMax-M2.7",
-                    "max_tokens": max_tokens,
-                    "temperature": 0.3,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            choices = resp.json().get("choices", [])
-            if choices and isinstance(choices[0], dict):
-                content = choices[0].get("message", {}).get("content", "")
-            else:
-                content = ""
-            print(f"  [MiniMax OK]", flush=True)
-            return content
-        except Exception as e:
-            print(f"  [MiniMax 失败{' (重试)' if attempt < retries else ''}] {e}", flush=True)
-            if attempt < retries:
-                import time; time.sleep(2)
-    return ""
-
-
-def _call_minimax(prompt: str, parse_response, retries: int = 2):
-    """调用 MiniMax M2.7 进行单条分析"""
-    content = _call_minimax_raw(prompt, timeout=60, max_tokens=600, retries=retries)
-    return parse_response(content)
-
-
-
-def analyze_fundraising(results: list[dict]) -> list[dict]:
-    """并行分析融资结果（多线程）"""
-    if not results:
-        return []
-
-    analyzed = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(_analyze_single_fundraising, r): r for r in results}
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                analyzed.append(future.result())
-            except Exception as e:
-                r = futures[future]
-                print(f"  [融资分析失败] {r.get('title', '')[:40]}: {e}", flush=True)
-                r["analysis"] = {"filter": True}
-                analyzed.append(r)
-    return analyzed
-
-
-def _fallback_analysis(result: dict) -> dict:
-    """
-    独立运行时的简易分析（无 AI 模型）。
-    核心逻辑：品牌名必须出现在标题或内容中，否则直接过滤。
-    fallback 模式不生成切入建议（避免模板化套话）。
-    """
-    title = result.get("title", "")
-    content = result.get("content", "")[:500]
-    brand = result.get("brand", "")
-    brand_names = result.get("brand_names", [brand])
-    text = f"{title} {content}"
-
-    # ---- 第一关：品牌相关性（硬门槛）----
-    matched_brand = ""
-    for bn in brand_names:
-        if bn and bn in text:
-            matched_brand = bn
-            break
-
-    if not matched_brand:
-        # 品牌名未在文本中出现：不直接过滤，交给 AI 进一步判断
-        return {
-            "relevance_score": 4,
-            "urgency": "⚪",
-            "intel_summary": "",
-            "focus_media_angle": "",
-            "recommendation_reason": "",
-            "talk_track": "",
-            "filter": False,
-            "filter_reason": f"内容未明确提及{brand}，待 AI 判断",
-        }
-
-    # ---- 第 1.5 关：标题主体检查（品牌是配角则降级过滤）----
-    brand_in_title = any(bn and bn in title for bn in brand_names)
-    if brand_in_title:
-        # 检查标题中是否有其他更突出的品牌/主体
-        # 模式："联合X""携手X""与X合作" 等 — 品牌出现在介词/动词宾语位置，不是主体
-        peripheral_patterns = [
-            rf'联合{re.escape(matched_brand)}',
-            rf'携手{re.escape(matched_brand)}',
-            rf'与{re.escape(matched_brand)}',
-            rf'和{re.escape(matched_brand)}',
-            rf'跨界{re.escape(matched_brand)}',
-            rf'{re.escape(matched_brand)}联名',
-            rf'{re.escape(matched_brand)}送',
-            rf'{re.escape(matched_brand)}合作',
-        ]
-        is_peripheral = any(re.search(p, title) for p in peripheral_patterns)
-
-        # 额外检查：标题前半段是否由其他品牌/实体主导
-        # 如果品牌名只出现在标题后半段的从属结构中，也视为配角
-        if not is_peripheral:
-            brand_pos = title.find(matched_brand)
-            title_mid = len(title) // 2
-            # 品牌在后半段，且前半段有明确的其他主体（含中文品牌名模式）
-            if brand_pos > title_mid:
-                front_half = title[:brand_pos]
-                # 如果前半段包含其他产品/品牌关键词，品牌可能是配角
-                other_subject_signals = ["新车", "新品", "车型", "上市", "宠粉"]
-                if any(s in front_half for s in other_subject_signals):
-                    is_peripheral = True
-
-        if is_peripheral:
-            return {
-                "relevance_score": 2,
-                "urgency": "⚪",
-                "intel_summary": "",
-                "focus_media_angle": "",
-                "recommendation_reason": "",
-                "talk_track": "",
-                "filter": True,
-                "filter_reason": f"{matched_brand}在该文章中仅为配角/联合方，非主体报道",
-            }
-    elif not any(bn and bn in content[:300] for bn in brand_names):
-        # 品牌名不在标题中，也不在内容前300字中 → 弱相关
-        return {
-            "relevance_score": 2,
-            "urgency": "⚪",
-            "intel_summary": "",
-            "focus_media_angle": "",
-            "recommendation_reason": "",
-            "talk_track": "",
-            "filter": True,
-            "filter_reason": f"{matched_brand}仅在内容深处提及，非主体报道",
-        }
-
-    # ---- 第二关：信号词打分 ----
-    score = 4
-    urgency = "⚪"
-    reason = ""
-
-    high_signals = {
-        "发布会": "近期有发布会动态，可能有品牌曝光需求",
-        "新品发布": "新品发布期，品牌推广预算释放窗口",
-        "代言人": "代言人动态，品牌正在加大传播投入",
-        "品牌升级": "品牌升级期，需要大规模心智刷新",
-        "广告投放": "有明确的广告投放动作",
-        "营销战役": "正在策划或执行营销战役",
-        "品牌发布": "品牌层面有重大发布",
-        "全球首发": "全球首发产品，高传播价值窗口",
-    }
-    mid_signals = {
-        "新品": "有新品动态，可能伴随推广需求",
-        "融资": "获得融资，品牌投放预算可能增加",
-        "上市": "新品上市期，传播需求集中",
-        "合作": "有品牌合作动态",
-        "签约": "签约合作，可能有联合推广",
-        "CMO": "营销高管变动，决策链可能调整",
-        "品牌总监": "品牌负责人变动，值得关注",
-        "市场总监": "市场负责人变动，值得关注",
-    }
-    low_signals = {
-        "销量": "销量数据变化",
-        "市场份额": "市场格局变化",
-        "补贴": "补贴政策变化",
-        "竞争": "竞争格局变化",
-        "政策": "行业政策变化",
-    }
-
-    for kw, r in high_signals.items():
-        if kw in text:
-            score = 9
-            urgency = "🔴"
-            reason = r
-            break
-
-    if score < 9:
-        for kw, r in mid_signals.items():
-            if kw in text:
-                score = 7
-                urgency = "🟡"
-                reason = r
-                break
-
-    if score < 7:
-        for kw, r in low_signals.items():
-            if kw in text:
-                score = 5
-                urgency = "⚪"
-                reason = r
-                break
-
-    if not reason:
-        reason = f"{matched_brand}近期有行业动态"
-
-    return {
-        "relevance_score": score,
-        "urgency": urgency,
-        "intel_summary": "",
-        "focus_media_angle": "",  # fallback 模式不生成建议
-        "recommendation_reason": reason,
-        "talk_track": "",
-        "filter": False,
-        "filter_reason": "",
-    }
 
 
 def run_pipeline(
@@ -658,8 +247,14 @@ def _run_pipeline_inner(
         # 独立搜索 - 使用混合搜索模式
         print("\n[Step 1] 混合搜索（Bocha + 白名单直接抓取）...")
 
-        # 品牌搜索：使用混合模式
-        brand_results = run_hybrid_search(brand_configs, config)
+        # 检查是否跳过客户新闻（只跑行业和代言人）
+        skip_customer_news = config.get("skip_customer_news", False)
+        if skip_customer_news:
+            print("  [特殊规则] 跳过客户新闻，只保留行业和代言人")
+            brand_results = []
+        else:
+            # 品牌搜索：使用混合模式
+            brand_results = run_hybrid_search(brand_configs, config)
 
         # 行业搜索：保持原有逻辑
         if include_industry:
@@ -708,17 +303,22 @@ def _run_pipeline_inner(
             print(f"  [Profile 过滤] 融资结果: {before_count} → {len(fundraising_results)} 条（过滤 {filtered_count} 条不相关行业）")
 
     if use_cache:
-        new_results = all_raw
-        print(f"\n[Step 2] 从存档加载（跳过重复检查）: {len(brand_industry_results)} 条客户新闻 + {len(fundraising_results)} 条融资新闻")
-    else:
-        # 品牌/行业去重
-        brand_industry_deduped = deduplicate(brand_industry_results)
-        # 融资结果也需要去重（搜索池中相同URL可能重复出现）
+        # 融资结果去重（cache 模式下 brand_industry 也交给 preprocess 去重）
         fundraising_deduped = deduplicate(fundraising_results)
+        fundraising_deduped = dedup_fundraising_by_company(fundraising_deduped)
+        if len(fundraising_deduped) < len(fundraising_results):
+            print(f"  [融资去重] {len(fundraising_results)} → {len(fundraising_deduped)} 条")
+        new_results = brand_industry_results + fundraising_deduped
+        print(f"\n[Step 2] 从存档加载: {len(new_results)} 条（融资 {len(fundraising_deduped)} 条已去重）")
+    else:
+        # 融资结果去重：URL/标题去重 + 公司名归一化去重（融资不经过 layer2 的 LLM）
+        fundraising_deduped = deduplicate(fundraising_results)
+        fundraising_deduped = dedup_fundraising_by_company(fundraising_deduped)
         if len(fundraising_deduped) < len(fundraising_results):
             print(f"  [融资去重] {len(fundraising_results)} → {len(fundraising_deduped)} 条（过滤 {len(fundraising_results) - len(fundraising_deduped)} 条重复）")
-        new_results = brand_industry_deduped + fundraising_deduped
-        print(f"\n[Step 2] 去重后: {len(new_results)} 条新结果")
+        # 品牌/行业去重并入 layer2 preprocess() 内部（统一处理）
+        new_results = brand_industry_results + fundraising_deduped
+        print(f"\n[Step 2] 预处理前: {len(new_results)} 条（融资 {len(fundraising_deduped)} 条已去重）")
         # 存档搜索结果（支持后续重新生成报告）
         if new_results:
             from scripts.search_archive import save_results as archive_save
@@ -730,99 +330,96 @@ def _run_pipeline_inner(
         print("  无新结果，跳过日报")
         return ""
 
-    # 重新从 new_results 分离（去重后结果可能变化）
-    brand_industry_results = [r for r in new_results if not r.get("brand", "").startswith("[融资]")]
-    fundraising_results = [r for r in new_results if r.get("brand", "").startswith("[融资]")]
+    # ── Step 2: Layer 2 预处理 ───────────────────────────────
+    print("\n[Step 2] Layer 2 预处理...")
+    from scripts.dedup import get_recent_events_for_brand
 
-    # ── Step 2b: LLM 分类（品牌归属、行业分类、信息归拢）──────
-    if brand_industry_results and not use_cache:
-        try:
-            from scripts.classifier import classify_results, deduplicate_by_group
-            print(f"\n[Step 2b] LLM 分类 Agent...")
-            before_count = len(brand_industry_results)
-            brand_industry_results = classify_results(
-                brand_industry_results,
-                profile_brands=brand_configs,
-                profile_industries=industry_configs,
-            )
-            # 按 group_id 归拢同一事件
-            brand_industry_results = deduplicate_by_group(brand_industry_results)
-            print(f"  分类后: {before_count} → {len(brand_industry_results)} 条")
-        except Exception as e:
-            print(f"  [分类 Agent 异常] {e}，跳过分类步骤")
+    # 收集所有品牌的近期事件（用于 LLM 判断跟进），转为字符串格式
+    all_recent = []
+    for cfg in brand_configs:
+        recent = get_recent_events_for_brand(cfg.get("name", ""))
+        all_recent.extend([f"{e.get('brand', '')} - {e.get('event_key', '')}"
+                          for e in recent if e.get("event_key")])
 
-    # ── Step 3: AI 分析 ────────────────────────────────────
-    print("\n[Step 3] 开始 AI 分析...")
+    # 融资结果不参与 LLM 分类（只在搜索时标注 track_name）
+    brand_industry_raw = [r for r in new_results
+                          if not r.get("brand", "").startswith("[融资]")]
+    fundraising_raw = [r for r in new_results
+                       if r.get("brand", "").startswith("[融资]")]
 
-    # 品牌/行业结果分析
-    analyzed_brand = analyze_with_openclaw(brand_industry_results) if brand_industry_results else []
-    # 融资结果分析
-    analyzed_fr = analyze_fundraising(fundraising_results) if fundraising_results else []
+    # 品牌/行业：去重并入 preprocess 内部；融资：统一在这里去重
+    if brand_industry_raw and not use_cache:
+        brand_industry_clean = preprocess(
+            raw_results=brand_industry_raw,
+            brand_configs=brand_configs,
+            industry_configs=industry_configs,
+            profile_fundraising_tracks=fundraising_config.get("tracks", []),
+            recent_events=all_recent,
+        )
+    else:
+        brand_industry_clean = brand_industry_raw
 
-    analyzed = analyzed_brand + analyzed_fr
+    # 融资去重：fresh 模式在 Step 1 已做，cache 模式需要单独做
+    if use_cache:
+        fundraising_clean = dedup_fundraising_by_company(fundraising_raw)
+    else:
+        fundraising_clean = fundraising_raw
 
-    # ── Step 4: 过滤低分 + 信息源追踪 ────────────────────────
-    filtered = filter_by_score(analyzed, min_score=min_score)
-    print(f"  过滤后: {len(filtered)} 条有效情报")
+    all_items = brand_industry_clean + fundraising_clean
+    print(f"  Layer 2 预处理后: {len(all_items)} 条")
 
-    # ── Step 4b: 来源质量过滤 ────────────────────────────────
-    filtered_before_source = len(filtered)
-    filtered = _filter_by_source_quality(filtered)
-    if len(filtered) < filtered_before_source:
-        print(f"  [来源质量] {filtered_before_source} → {len(filtered)} 条（过滤 {filtered_before_source - len(filtered)} 条低质量来源）")
+    if not all_items:
+        print("  无有效条目，跳过日报")
+        return ""
 
-    # 信息源质量追踪（高分结果计入 source_quality.json）
-    try:
-        record_source_hits(analyzed, min_score=7)
-    except Exception as e:
-        print(f"  [信息来源追踪失败] {e}")
+    # ── Step 3: Layer 3 大厨 LLM ─────────────────────────────
+    print("\n[Step 3] Layer 3 大厨 LLM...")
+    from scripts.dedup import load_seen_events
+    from scripts.scheduler import get_schedule_flags
 
-    # ── Step 5: 生成日报 ───────────────────────────────────
-    print("\n[Step 5] 生成日报...")
-    # 从 filtered 中提取融资结果（已通过 Step 4 + Step 4b 过滤）
-    fundraising_for_report = [r for r in filtered if r.get("brand", "").startswith("[融资]")]
-    # first_run 已由 run_single_profile_pipeline 在存档保存前计算并传入
-    report = generate_full_report(
-        analyzed_results=filtered,
-        fundraising_results=fundraising_for_report,
-        date_str=date_str,
-        profile_name=profile_name,
-        brand_configs=brand_configs,
-        is_first_run=first_run,
+    recent_events_list = load_seen_events()
+    schedule = get_schedule_flags()
+
+    report = chef_report(
+        items=all_items,
+        config=config,
+        schedule=schedule,
+        recent_events=[f"{e.get('brand', '')} - {e.get('event_key', '')}"
+                       for e in recent_events_list if e.get("event_key")],
         endorsement_items=endorsement_items or [],
     )
-    print(f"  日报生成完成，共 {len(report)} 字符")
+    print(f"  报告生成完成，共 {len(report)} 字符")
 
-    # ── Step 5b: 自动 Review ─────────────────────────────────
+    # ── Step 3b: 质检 ─────────────────────────────────────
     if report and not dry_run:
-        try:
-            from scripts.review_agent import review_report, format_review_output
-            print("\n[Step 5b] 日报质量评审...")
-            review_result = review_report(report, profile_name or "default")
-            review_output = format_review_output(review_result, profile_name or "default")
-            print(review_output)
+        print("\n[Step 3b] 质检...")
+        qc_result = quality_check(report, all_items)
 
-            # 如果评分低于 7 分，打印警告
-            if review_result["overall_score"] < 7.0:
-                print(f"  [Review 警告] 日报评分 {review_result['overall_score']:.1f}/10，低于质量阈值")
-                for suggestion in review_result.get("revision_suggestions", []):
-                    print(f"    → {suggestion}")
-        except Exception as e:
-            print(f"  [Review 异常] {e}")
+        if not qc_result["pass"]:
+            print(f"  [质检首次] 发现问题: {qc_result.get('hallucination_issues', qc_result.get('format_issues', []))}")
+            # 首次失败：注入反馈，重新生成
+            report = retry_with_feedback(report, qc_result, all_items)
+            qc_result2 = quality_check(report, all_items)
+            if not qc_result2["pass"]:
+                print(f"  [质检重试后] 仍有问题，标记人工审核")
+                report = "⚠️ 需要人工审核\n\n" + report
+            else:
+                print(f"  [质检] 已自动修复")
+        else:
+            print(f"  [质检通过]")
 
-    # ── Step 6: 记录本次推送 ───────────────────────────────
-    from scripts.dedup import record_pushed_events, _normalize_title
+    # ── Step 4: 记录本次推送 ───────────────────────────────
+    from scripts.dedup import record_pushed_events
     pushed_events = []
-    for r in filtered:
-        analysis = r.get("analysis", {})
-        if analysis.get("is_followup", False):
+    for item in all_items:
+        if item.get("is_followup", False):
             continue
-        event_key = analysis.get("event_key", "")
+        event_key = item.get("event_key", "")
         if not event_key:
-            # AI 返回空 event_key 时，使用标题前20字作为 fallback
-            event_key = _normalize_title(r.get("title", ""))[:20]
+            # 没有 event_key 时，使用标题前20字作为 fallback
+            event_key = _normalize_title(item.get("title", ""))[:20]
         pushed_events.append({
-            "brand": r.get("brand", ""),
+            "brand": item.get("brand", ""),
             "event_key": event_key,
         })
     if pushed_events:

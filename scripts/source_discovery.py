@@ -62,8 +62,8 @@ def _load_discovered_domains() -> set:
                 domains = set(data.get("domains", []))
                 # 合并初始域名
                 return domains | _INITIAL_DOMAINS
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [警告] 加载域名发现缓存失败: {e}")
     return _INITIAL_DOMAINS.copy()
 
 

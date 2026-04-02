@@ -2,8 +2,8 @@
 # Sales Intel 每日定时任务脚本
 # 由 launchd 每天 8:00 & 12:00 触发 + watchdog 周期性检查补跑
 
-SALES_INTEL_DIR="/Users/Joe_1/Desktop/Vibe Working/tools/sales-intel"
-OUTPUT_DIR="/Users/Joe_1/Desktop/AI output/sales intel"
+SALES_INTEL_DIR="/Users/Joe_1/Desktop/Development/sales-intel"
+OUTPUT_DIR="/Users/Joe_1/Desktop/AI output/sales-intel"
 FLAG_FILE="$OUTPUT_DIR/.last_run_date"
 LOG_FILE="$OUTPUT_DIR/launchd.log"
 ERROR_LOG_FILE="$OUTPUT_DIR/launchd.error.log"

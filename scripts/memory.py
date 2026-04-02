@@ -8,31 +8,17 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 
+# 使用统一的档案上下文管理
+from scripts.profile_context import get_profile, set_profile, get_profile_data_dir
+
 
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
-_profile_name = None  # 当前 profile 名，None 表示 "default"
-
-def _data_dir() -> str:
-    if _profile_name:
-        return os.path.join(PROJECT_ROOT, "data", "profiles", _profile_name)
-    return os.path.join(PROJECT_ROOT, "data", "profiles", "default")
 
 def _memory_path() -> str:
-    return os.path.join(_data_dir(), "memory.json")
+    return os.path.join(get_profile_data_dir(), "memory.json")
 
 def _feedback_path() -> str:
-    return os.path.join(_data_dir(), "feedback.json")
-
-
-def set_profile(name: str = None):
-    """切换到指定 profile 的数据目录（None=默认/default）"""
-    global _profile_name
-    _profile_name = name
-    os.makedirs(_data_dir(), exist_ok=True)
-
-
-def get_profile() -> str:
-    return _profile_name or "default"
+    return os.path.join(get_profile_data_dir(), "feedback.json")
 
 # 记忆衰减配置
 INTEREST_DECAY_DAYS = 30  # 兴趣权重超过30天不更新则轻微衰减
@@ -53,7 +39,8 @@ def load_memory() -> dict:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"  [警告] 加载 memory 失败 ({path}), 使用默认: {e}")
         return _default_memory()
 
 
@@ -88,7 +75,8 @@ def load_feedback() -> list:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"  [警告] 加载 feedback 失败 ({path}): {e}")
         return []
 
 

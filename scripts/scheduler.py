@@ -69,6 +69,8 @@ def _merge_config_with_profile(shared_config: dict, profile: dict) -> dict:
         # search/report 配置沿用 shared config
         "search": shared_config.get("search", {}),
         "report": shared_config.get("report", {}),
+        # 特殊 flag：跳过客户新闻（只跑行业和代言人）
+        "skip_customer_news": profile.get("skip_customer_news", False),
     }
 
 

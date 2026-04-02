@@ -48,8 +48,8 @@ def _get_connection(profile_name: str = "default") -> sqlite3.Connection:
     # 兼容旧数据库：补充缺失的列
     try:
         conn.execute("ALTER TABLE run_meta ADD COLUMN profile_config TEXT DEFAULT '{}'")
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  [警告] 迁移旧数据库失败: {e}")
     conn.commit()
     return conn
 
@@ -80,8 +80,8 @@ def save_results(results: list[dict], date_str: str, profile_name: str = "defaul
                 r.get("track_name", ""),
             ))
             saved += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"  [警告] 保存结果失败 ({r.get('url', '')}): {e}")
     # profile_config 快照：存储 brands + industries 名称列表
     config_snapshot = json.dumps(profile_config, ensure_ascii=False) if profile_config else "{}"
     cursor.execute("""

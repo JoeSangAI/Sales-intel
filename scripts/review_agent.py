@@ -322,12 +322,39 @@ def review_report(report_text: str, profile_name: str = "") -> dict:
     else:
         summary = f"日报质量堪忧（{overall_score:.1f}/10），{source_issues[0] if source_issues else '信息源质量差，建议彻底重构搜索策略'}"
 
+    # ── 判断返工类型 ──────────────────────────────────
+    rework_type = "none"
+    rework_reasons = []
+
+    if overall_score < 7.0:
+        # Type A: 原材料问题 — 需要重新搜索
+        if dimensions["source_quality"] < 5.0:
+            rework_type = "material"
+            rework_reasons.append("信源质量差，需换关键词重新搜索")
+        if dimensions["completeness"] < 5.0:
+            rework_type = "material"
+            rework_reasons.append("信息覆盖不足，需扩大搜索范围")
+
+        # Type B: 炒菜问题 — 需要重新分析（不覆盖 Type A）
+        if rework_type == "none":
+            if dimensions["advice_depth"] < 5.0:
+                rework_type = "cooking"
+                rework_reasons.append("洞察建议不够深度")
+            if dimensions["accuracy"] < 5.0:
+                rework_type = "cooking"
+                rework_reasons.append("分析准确性不足")
+            if dimensions["work_value"] < 5.0:
+                rework_type = "cooking"
+                rework_reasons.append("对销售工作价值有限")
+
     return {
         "overall_score": round(overall_score, 1),
         "dimensions": dimensions,
         "findings": findings,
         "missed_opportunities": missed,
         "revision_suggestions": suggestions,
+        "rework_type": rework_type,
+        "rework_reasons": rework_reasons,
         "summary": summary,
         "stats": {
             "total_items": parsed["total_items"],

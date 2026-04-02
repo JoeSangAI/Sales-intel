@@ -3,7 +3,7 @@ name: 销售情报助手
 description: 自动搜索品牌/行业动态和融资信号，生成分众传媒销售视角的每日情报简报
 version: 0.2.0
 author: Joe
-project_root: /Users/Joe_1/Desktop/Vibe Working/tools/sales-intel
+project_root: /Users/Joe_1/Desktop/Development/sales-intel
 trigger:
   - 销售情报
   - 今日情报
@@ -11,9 +11,6 @@ trigger:
   - 行业动态
   - 融资动态
   - sales intel
-schedule:
-  cron: "0 8 * * *"
-  heartbeat: HEARTBEAT.md
 env:
   - BOCHA_API_KEY
   - MINIMAX_API_KEY
