@@ -111,6 +111,8 @@ def _parse_qc_response(text: str) -> dict:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+    # 去掉 MiniMax 思考块
+    text = re.sub(r'<think>[\s\S]*?</think>', '', text)
 
     try:
         return json.loads(text)

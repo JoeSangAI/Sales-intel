@@ -43,6 +43,8 @@ def _call_llm(prompt: str, timeout: int = 180, max_tokens: int = 8000) -> str:
             else:
                 content = ""
             print(f"  [Chef MiniMax OK] 生成了 {len(content)} 字符", flush=True)
+            # 去掉 MiniMax 思考块
+            content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
             return content
         except Exception as e:
             print(f"  [Chef MiniMax 失败{' (重试)' if attempt < 2 else ''}] {e}", flush=True)

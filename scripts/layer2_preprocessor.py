@@ -216,6 +216,8 @@ def _parse_classify_response(text: str, items: list[dict]) -> list[dict]:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
+    # 去掉 MiniMax 思考块
+    text = re.sub(r'<think>[\s\S]*?</think>', '', text)
 
     try:
         parsed = json.loads(text)
