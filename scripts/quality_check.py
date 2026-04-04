@@ -165,7 +165,8 @@ def quality_check(report: str, original_items: list[dict]) -> dict:
 
 
 def retry_with_feedback(report: str, feedback: dict,
-                        original_items: list[dict]) -> str:
+                        original_items: list[dict],
+                        config: dict = None) -> str:
     """
     将质检反馈注入 prompt，重新生成报告。
 
@@ -173,6 +174,7 @@ def retry_with_feedback(report: str, feedback: dict,
         report: 上一次生成的报告（仅供参考）
         feedback: quality_check() 返回的质检结果
         original_items: Layer 2 输出的原始条目列表
+        config: 档案配置（brands/industries/fundraising），用于白名单过滤
 
     Returns:
         str: 重新生成的 Markdown 报告
@@ -182,6 +184,18 @@ def retry_with_feedback(report: str, feedback: dict,
     # 提取幻觉问题构建反馈
     hallucination_issues = feedback.get("hallucination_issues", [])
     format_issues = feedback.get("format_issues", [])
+
+    # 构建白名单信息
+    whitelist_section = ""
+    if config:
+        brand_names = [b.get("name", "") for b in config.get("brands", []) if b.get("name")]
+        track_names = [t.get("name", "") for t in config.get("fundraising", {}).get("tracks", []) if t.get("name")]
+        whitelist_section = f"""
+【该销售的白名单 - 严格执行】
+注册品牌（客户新闻只能包含这些品牌）：{", ".join(brand_names) if brand_names else "无"}
+注册赛道（融资速报只能包含这些赛道）：{", ".join(track_names) if track_names else "无"}
+⚠️ 不在上述白名单中的品牌/赛道，必须从报告中完全删除，不能仅改标签。
+"""
 
     # 原始新闻列表
     item_lines = []
@@ -201,7 +215,7 @@ def retry_with_feedback(report: str, feedback: dict,
 
 格式问题：
 {chr(10).join(f"- {issue}" for issue in format_issues) if format_issues else "无"}
-
+{whitelist_section}
 【原始新闻列表（必须严格使用这些 URL）】
 {chr(10).join(item_lines) if item_lines else "（无原始新闻）"}
 
@@ -212,7 +226,9 @@ def retry_with_feedback(report: str, feedback: dict,
 1. 报告中所有 [xxx](url) 的 url 必须来自上述原始新闻列表
 2. 关键数字/日期必须与原始新闻一致
 3. 保持原有结构和有价值内容，只修复质检问题
-4. 直接输出修复后的 Markdown 报告，不要有前缀文字。
+4. **品牌不在注册品牌白名单中的客户新闻条目，必须整条删除**
+5. **赛道不在注册赛道白名单中的融资条目，必须整条删除**
+6. 直接输出修复后的 Markdown 报告，不要有前缀文字。
 
 直接输出 Markdown 报告。"""
 

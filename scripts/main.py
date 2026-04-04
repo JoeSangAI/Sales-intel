@@ -374,6 +374,23 @@ def _run_pipeline_inner(
         fundraising_clean = fundraising_raw
 
     all_items = brand_industry_clean + fundraising_clean
+
+    # ── Step 2b: 白名单硬过滤（规则级，不依赖 LLM）─────────────
+    # 融资条目：只保留 profile 注册赛道内的
+    profile_industries = {ind.get("name", "") for ind in industry_configs}
+    profile_tracks = {t.get("name", "") for t in fundraising_config.get("tracks", [])}
+    allowed_sectors = profile_industries | profile_tracks
+    if allowed_sectors:
+        before_whitelist = len(all_items)
+        all_items = [
+            item for item in all_items
+            if not item.get("brand", "").startswith("[融资]")
+            or _fundraising_matches_profile(item, allowed_sectors)
+        ]
+        wl_filtered = before_whitelist - len(all_items)
+        if wl_filtered > 0:
+            print(f"  [白名单硬过滤] 移除 {wl_filtered} 条不属于注册赛道的融资条目")
+
     print(f"  Layer 2 预处理后: {len(all_items)} 条")
 
     if not all_items:
@@ -406,7 +423,7 @@ def _run_pipeline_inner(
         if not qc_result["pass"]:
             print(f"  [质检首次] 发现问题: {qc_result.get('hallucination_issues', qc_result.get('format_issues', []))}")
             # 首次失败：注入反馈，重新生成
-            report = retry_with_feedback(report, qc_result, all_items)
+            report = retry_with_feedback(report, qc_result, all_items, config=config)
             qc_result2 = quality_check(report, all_items)
             if not qc_result2["pass"]:
                 print(f"  [质检重试后] 仍有问题，标记人工审核")
