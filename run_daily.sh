@@ -34,6 +34,9 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] === 销售情报任务开始 ===" >> "$LOG_
 python scripts/main.py --profile-all >> "$LOG_FILE" 2>> "$ERROR_LOG_FILE"
 EXIT_CODE=$?
 
+# 执行域名质量追踪（记录当日搜索结果的域名命中数据）
+python scripts/domain_quality_tracker.py >> "$LOG_FILE" 2>> "$ERROR_LOG_FILE"
+
 # 标记今天已完成
 echo "$TODAY" > "$FLAG_FILE"
 

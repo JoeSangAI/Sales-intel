@@ -1,0 +1,1381 @@
+{
+  "news.qq.com": {
+    "total_7d": 89,
+    "valuable_7d": 51,
+    "hit_rate_7d": 0.5730337078651685,
+    "days_seen": 1,
+    "signals": {
+      "融资": 37,
+      "新市场": 4,
+      "新品发布": 6,
+      "代言人": 4
+    },
+    "avg_daily_hit_rate": 0.5730337078651685,
+    "last_updated": "2026-04-06"
+  },
+  "wallstreetcn.com": {
+    "total_7d": 5,
+    "valuable_7d": 4,
+    "hit_rate_7d": 0.8,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4
+    },
+    "avg_daily_hit_rate": 0.8,
+    "last_updated": "2026-04-06"
+  },
+  "fund.eastmoney.com": {
+    "total_7d": 9,
+    "valuable_7d": 2,
+    "hit_rate_7d": 0.2222222222222222,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 0.2222222222222222,
+    "last_updated": "2026-04-06"
+  },
+  "topnews.cn": {
+    "total_7d": 29,
+    "valuable_7d": 14,
+    "hit_rate_7d": 0.4827586206896552,
+    "days_seen": 1,
+    "signals": {
+      "融资": 7,
+      "新品发布": 7
+    },
+    "avg_daily_hit_rate": 0.4827586206896552,
+    "last_updated": "2026-04-06"
+  },
+  "163.com": {
+    "total_7d": 108,
+    "valuable_7d": 54,
+    "hit_rate_7d": 0.5,
+    "days_seen": 1,
+    "signals": {
+      "融资": 42,
+      "新市场": 2,
+      "新品发布": 9,
+      "代言人": 1
+    },
+    "avg_daily_hit_rate": 0.5,
+    "last_updated": "2026-04-06"
+  },
+  "m.bjnews.com.cn": {
+    "total_7d": 3,
+    "valuable_7d": 3,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 3
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.163.com": {
+    "total_7d": 75,
+    "valuable_7d": 37,
+    "hit_rate_7d": 0.49333333333333335,
+    "days_seen": 1,
+    "signals": {
+      "融资": 15,
+      "新市场": 5,
+      "新品发布": 15,
+      "大规模投放": 1,
+      "代言人": 1
+    },
+    "avg_daily_hit_rate": 0.49333333333333335,
+    "last_updated": "2026-04-06"
+  },
+  "sohu.com": {
+    "total_7d": 33,
+    "valuable_7d": 14,
+    "hit_rate_7d": 0.42424242424242425,
+    "days_seen": 1,
+    "signals": {
+      "融资": 7,
+      "新品发布": 6,
+      "大规模投放": 1
+    },
+    "avg_daily_hit_rate": 0.42424242424242425,
+    "last_updated": "2026-04-06"
+  },
+  "hea.china.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.chinairn.com": {
+    "total_7d": 14,
+    "valuable_7d": 4,
+    "hit_rate_7d": 0.2857142857142857,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4
+    },
+    "avg_daily_hit_rate": 0.2857142857142857,
+    "last_updated": "2026-04-06"
+  },
+  "jiemian.com": {
+    "total_7d": 11,
+    "valuable_7d": 6,
+    "hit_rate_7d": 0.5454545454545454,
+    "days_seen": 1,
+    "signals": {
+      "融资": 3,
+      "新品发布": 3
+    },
+    "avg_daily_hit_rate": 0.5454545454545454,
+    "last_updated": "2026-04-06"
+  },
+  "robot.ofweek.com": {
+    "total_7d": 4,
+    "valuable_7d": 4,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "chinairn.com": {
+    "total_7d": 6,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.16666666666666666,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.16666666666666666,
+    "last_updated": "2026-04-06"
+  },
+  "stcn.com": {
+    "total_7d": 3,
+    "valuable_7d": 3,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2,
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "i.ifeng.com": {
+    "total_7d": 8,
+    "valuable_7d": 8,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 8
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "36kr.com": {
+    "total_7d": 9,
+    "valuable_7d": 3,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "融资": 3
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "ofweek.com": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "100ec.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "finance.stockstar.com": {
+    "total_7d": 7,
+    "valuable_7d": 6,
+    "hit_rate_7d": 0.8571428571428571,
+    "days_seen": 1,
+    "signals": {
+      "融资": 6
+    },
+    "avg_daily_hit_rate": 0.8571428571428571,
+    "last_updated": "2026-04-06"
+  },
+  "tech.ifeng.com": {
+    "total_7d": 29,
+    "valuable_7d": 15,
+    "hit_rate_7d": 0.5172413793103449,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4,
+      "新品发布": 11
+    },
+    "avg_daily_hit_rate": 0.5172413793103449,
+    "last_updated": "2026-04-06"
+  },
+  "eeo.com.cn": {
+    "total_7d": 23,
+    "valuable_7d": 20,
+    "hit_rate_7d": 0.8695652173913043,
+    "days_seen": 1,
+    "signals": {
+      "融资": 15,
+      "新市场": 2,
+      "新品发布": 3
+    },
+    "avg_daily_hit_rate": 0.8695652173913043,
+    "last_updated": "2026-04-06"
+  },
+  "k.sina.com.cn": {
+    "total_7d": 90,
+    "valuable_7d": 7,
+    "hit_rate_7d": 0.07777777777777778,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 6,
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.07777777777777778,
+    "last_updated": "2026-04-06"
+  },
+  "cfen.com.cn": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "finance.sina.com.cn": {
+    "total_7d": 38,
+    "valuable_7d": 19,
+    "hit_rate_7d": 0.5,
+    "days_seen": 1,
+    "signals": {
+      "融资": 9,
+      "新品发布": 9,
+      "新市场": 1
+    },
+    "avg_daily_hit_rate": 0.5,
+    "last_updated": "2026-04-06"
+  },
+  "itcaigou.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "tech.hexun.com": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "user.guancha.cn": {
+    "total_7d": 18,
+    "valuable_7d": 7,
+    "hit_rate_7d": 0.3888888888888889,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 7
+    },
+    "avg_daily_hit_rate": 0.3888888888888889,
+    "last_updated": "2026-04-06"
+  },
+  "finance.eastmoney.com": {
+    "total_7d": 16,
+    "valuable_7d": 12,
+    "hit_rate_7d": 0.75,
+    "days_seen": 1,
+    "signals": {
+      "新市场": 2,
+      "融资": 10
+    },
+    "avg_daily_hit_rate": 0.75,
+    "last_updated": "2026-04-06"
+  },
+  "ithome.com": {
+    "total_7d": 28,
+    "valuable_7d": 25,
+    "hit_rate_7d": 0.8928571428571429,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4,
+      "新品发布": 21
+    },
+    "avg_daily_hit_rate": 0.8928571428571429,
+    "last_updated": "2026-04-06"
+  },
+  "bydrug.pharmcube.com": {
+    "total_7d": 9,
+    "valuable_7d": 9,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 9
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "ce.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "china.zjol.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新市场": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "toutiao.com": {
+    "total_7d": 8,
+    "valuable_7d": 3,
+    "hit_rate_7d": 0.375,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1,
+      "代言人": 2
+    },
+    "avg_daily_hit_rate": 0.375,
+    "last_updated": "2026-04-06"
+  },
+  "c.m.163.com": {
+    "total_7d": 56,
+    "valuable_7d": 21,
+    "hit_rate_7d": 0.375,
+    "days_seen": 1,
+    "signals": {
+      "新市场": 1,
+      "融资": 3,
+      "新品发布": 17
+    },
+    "avg_daily_hit_rate": 0.375,
+    "last_updated": "2026-04-06"
+  },
+  "pb.ccmn.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "nbd.com.cn": {
+    "total_7d": 4,
+    "valuable_7d": 3,
+    "hit_rate_7d": 0.75,
+    "days_seen": 1,
+    "signals": {
+      "融资": 3
+    },
+    "avg_daily_hit_rate": 0.75,
+    "last_updated": "2026-04-06"
+  },
+  "chinabgao.com": {
+    "total_7d": 18,
+    "valuable_7d": 6,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "融资": 6
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "m.chinabgao.com": {
+    "total_7d": 17,
+    "valuable_7d": 3,
+    "hit_rate_7d": 0.17647058823529413,
+    "days_seen": 1,
+    "signals": {
+      "融资": 3
+    },
+    "avg_daily_hit_rate": 0.17647058823529413,
+    "last_updated": "2026-04-06"
+  },
+  "ab-sm.com": {
+    "total_7d": 10,
+    "valuable_7d": 9,
+    "hit_rate_7d": 0.9,
+    "days_seen": 1,
+    "signals": {
+      "融资": 9
+    },
+    "avg_daily_hit_rate": 0.9,
+    "last_updated": "2026-04-06"
+  },
+  "ai.zol.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "server.zhiding.cn": {
+    "total_7d": 2,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.5,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.5,
+    "last_updated": "2026-04-06"
+  },
+  "soft.zhiding.cn": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "finance.china.com.cn": {
+    "total_7d": 3,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "m.tech.china.com": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "q.stock.sohu.com": {
+    "total_7d": 5,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "peoplecen.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "cet.com.cn": {
+    "total_7d": 3,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "wap.eastmoney.com": {
+    "total_7d": 2,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "donews.com": {
+    "total_7d": 4,
+    "valuable_7d": 4,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "eetrend.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "workercn.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "cnstock.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "acftu.people.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "bbs.hupu.com": {
+    "total_7d": 5,
+    "valuable_7d": 4,
+    "hit_rate_7d": 0.8,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 4
+    },
+    "avg_daily_hit_rate": 0.8,
+    "last_updated": "2026-04-06"
+  },
+  "xcc.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "p5w.net": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "askci.com": {
+    "total_7d": 2,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.5,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.5,
+    "last_updated": "2026-04-06"
+  },
+  "news.fznews.com.cn": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "chinaaet.com": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "chnmc.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "laohu8.com": {
+    "total_7d": 7,
+    "valuable_7d": 5,
+    "hit_rate_7d": 0.7142857142857143,
+    "days_seen": 1,
+    "signals": {
+      "融资": 4,
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 0.7142857142857143,
+    "last_updated": "2026-04-06"
+  },
+  "cir.cn": {
+    "total_7d": 7,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "cnr.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "cctime.com": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.askci.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "finance.nen.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "dzswgf.mofcom.gov.cn": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "miit.gov.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "china5e.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.iqilu.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "21jingji.com": {
+    "total_7d": 5,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.2,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 0.2,
+    "last_updated": "2026-04-06"
+  },
+  "j.people.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "chinareport.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "imgs.news.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "peoplechina.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "en.sasac.gov.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "portuguese.news.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "russian.people.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "yzwb.net": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "database.caixin.com": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "bk.taobao.com": {
+    "total_7d": 7,
+    "valuable_7d": 2,
+    "hit_rate_7d": 0.2857142857142857,
+    "days_seen": 1,
+    "signals": {
+      "大规模投放": 1,
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 0.2857142857142857,
+    "last_updated": "2026-04-06"
+  },
+  "yoojia.com": {
+    "total_7d": 38,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.02631578947368421,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 0.02631578947368421,
+    "last_updated": "2026-04-06"
+  },
+  "news.163.com": {
+    "total_7d": 16,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.17173.com": {
+    "total_7d": 3,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "finance.ifeng.com": {
+    "total_7d": 3,
+    "valuable_7d": 1,
+    "hit_rate_7d": 0.3333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 0.3333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "business.china.com": {
+    "total_7d": 5,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "mobile.zol.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "g.pconline.com.cn": {
+    "total_7d": 2,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "price.zol.com.cn": {
+    "total_7d": 6,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "cnpp.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.mydrivers.com": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "大规模投放": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "thecover.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "ai5g.china.com": {
+    "total_7d": 11,
+    "valuable_7d": 9,
+    "hit_rate_7d": 0.8181818181818182,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 9
+    },
+    "avg_daily_hit_rate": 0.8181818181818182,
+    "last_updated": "2026-04-06"
+  },
+  "xiaofei.nen.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.58moto.com": {
+    "total_7d": 5,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.cnmo.com": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "代言人": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "ie.ncu.edu.cn": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "3g.china.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "wap.sciencenet.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "game.zol.com.cn": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.ifeng.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "auto.zol.com.cn": {
+    "total_7d": 36,
+    "valuable_7d": 3,
+    "hit_rate_7d": 0.08333333333333333,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2,
+      "新市场": 1
+    },
+    "avg_daily_hit_rate": 0.08333333333333333,
+    "last_updated": "2026-04-06"
+  },
+  "tmtpost.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "mantan-web.jp": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "autohome.com.cn": {
+    "total_7d": 19,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "badmintoncn.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "takefoto.cn": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "t.cj.sina.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "cyjjyjy1.b2b168.com": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "cj.sina.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.chinatimes.net.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "stock.stockstar.com": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1,
+      "融资": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "big5.chinairn.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "dzb.xfrb.com.cn": {
+    "total_7d": 4,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "tyj.guizhou.gov.cn": {
+    "total_7d": 2,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "szjj.china.com.cn": {
+    "total_7d": 4,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "tz.zjol.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "qjwb.tidenews.com.cn": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "paper.cnstock.com": {
+    "total_7d": 2,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "beijing.trustexporter.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.mbalib.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "auto.ifeng.com": {
+    "total_7d": 17,
+    "valuable_7d": 4,
+    "hit_rate_7d": 0.23529411764705882,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2,
+      "融资": 2
+    },
+    "avg_daily_hit_rate": 0.23529411764705882,
+    "last_updated": "2026-04-06"
+  },
+  "dzrb.dzng.com": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "product.pconline.com.cn": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "qlwb.com.cn": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.zol.com.cn": {
+    "total_7d": 2,
+    "valuable_7d": 2,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 2
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "german.news.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "news.cnhubei.com": {
+    "total_7d": 1,
+    "valuable_7d": 1,
+    "hit_rate_7d": 1.0,
+    "days_seen": 1,
+    "signals": {
+      "新品发布": 1
+    },
+    "avg_daily_hit_rate": 1.0,
+    "last_updated": "2026-04-06"
+  },
+  "m.fang.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "no.mofcom.gov.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "auto.hexun.com": {
+    "total_7d": 3,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "sxrb.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "epaper.hljnews.cn": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  },
+  "qhweb.eastmoney.com": {
+    "total_7d": 1,
+    "valuable_7d": 0,
+    "hit_rate_7d": 0.0,
+    "days_seen": 1,
+    "signals": {},
+    "avg_daily_hit_rate": 0.0,
+    "last_updated": "2026-04-06"
+  }
+}
