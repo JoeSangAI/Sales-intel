@@ -11,6 +11,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 from scripts.minimax_client import call_minimax
+from scripts.quality_rules import run_rules_check
 
 
 # ── MiniMax API 调用 ────────────────────────────────────────────
@@ -114,7 +115,7 @@ def _parse_qc_response(text: str) -> dict:
 
 # ── 公开接口 ──────────────────────────────────────────────────
 
-def quality_check(report: str, original_items: list[dict]) -> dict:
+def quality_check(report: str, original_items: list[dict], profile: dict = None) -> dict:
     """
     质检：检查报告的格式正确性和幻觉问题。
 
@@ -131,6 +132,26 @@ def quality_check(report: str, original_items: list[dict]) -> dict:
             "pass": bool
         }
     """
+    # ── 第一层：规则校验（确定性）──
+    if profile and original_items:
+        rules_result = run_rules_check(report, original_items, profile)
+        if not rules_result["pass"]:
+            print(f"  [QC 规则失败] 阻断 {len(rules_result['issues'])} 个")
+            for issue in rules_result["issues"]:
+                print(f"    - {issue}")
+            return {
+                "format_ok": False,
+                "format_issues": rules_result["issues"],
+                "hallucination_ok": False,
+                "hallucination_issues": rules_result["issues"],
+                "pass": False,
+                "rules_issues": rules_result["issues"],
+                "rules_warnings": rules_result["warnings"],
+            }
+        if rules_result["warnings"]:
+            print(f"  [QC 规则警告] {len(rules_result['warnings'])} 个（非阻断）")
+    # ── 第二层：LLM 语义校验（继续原有逻辑）──
+
     if not report:
         return {
             "format_ok": False,

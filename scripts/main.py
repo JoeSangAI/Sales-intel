@@ -391,6 +391,17 @@ def _run_pipeline_inner(
         if wl_filtered > 0:
             print(f"  [白名单硬过滤] 移除 {wl_filtered} 条不属于注册赛道的融资条目")
 
+    # ── Step 2c: 融资公司名归一化去重 ──
+    fundraising_items = [i for i in all_items if i.get("brand", "").startswith("[融资]")]
+    if fundraising_items:
+        from scripts.dedup import dedup_fundraising_by_company
+        fundraising_deduped = dedup_fundraising_by_company(fundraising_items)
+        non_fundraising = [i for i in all_items if not i.get("brand", "").startswith("[融资]")]
+        all_items = non_fundraising + fundraising_deduped
+        removed = len(fundraising_items) - len(fundraising_deduped)
+        if removed > 0:
+            print(f"  [融资去重] 同公司合并: {len(fundraising_items)} → {len(fundraising_deduped)} 条")
+
     print(f"  Layer 2 预处理后: {len(all_items)} 条")
 
     if not all_items:

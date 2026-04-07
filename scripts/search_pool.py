@@ -109,6 +109,8 @@ def execute_shared_search(queries: list[dict], date_str: str = None) -> dict:
             if cached.get("date") == date_str:
                 print(f"  [搜索池] 加载缓存: {len(cached.get('results', {}))} 条查询")
                 return cached.get("results", {})
+            else:
+                print(f"  [搜索池] 缓存日期不匹配({cached.get('date')} != {date_str})，忽略缓存，执行搜索")
         except Exception as e:
             print(f"  [警告] 加载搜索池缓存失败: {e}")
 
@@ -207,14 +209,25 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
 
     for q_key, items in pool.items():
         for item in items:
+            # 日期过滤：只保留近3天内的结果
+            published_date = item.get("published_date", "")
+            if published_date:
+                try:
+                    pub = datetime.strptime(published_date[:10], "%Y-%m-%d")
+                    diff = (datetime.now() - pub).days
+                    if diff > 3:
+                        continue
+                except:
+                    pass
+
             brand = item.get("brand", "")
             track = item.get("track_name", "")
 
             # 融资结果：严格按赛道过滤（没有配置赛道则不分发融资结果）
             if brand.startswith("[融资]"):
                 if profile_tracks and track:
-                    # 精确匹配或模糊匹配
-                    if track in profile_tracks or any(t in track or track in t for t in profile_tracks):
+                    # 精确匹配
+                    if track in profile_tracks:
                         # AI 公司不能出现在非 AI 赛道（防止跨行业污染）
                         title = item.get("title", "")
                         ai_keywords = ["openai", "深度求索", "deepseek", "通义千问",
