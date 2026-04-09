@@ -135,6 +135,12 @@ def _build_classify_prompt(items: list[dict], brand_configs: list[dict],
 
     industry_lines = [f"- {ind.get('name', '')}" for ind in industry_configs]
 
+    # 赛道关键词映射（帮助 LLM 准确归类）
+    from scripts.quality_rules import _TRACK_BUSINESS_KEYWORDS
+    track_hint_lines = []
+    for track, keywords in _TRACK_BUSINESS_KEYWORDS.items():
+        track_hint_lines.append(f"- {track}: {', '.join(keywords[:8])}")
+
     event_lines = recent_events if recent_events else ["今日首次运行，无历史记录"]
 
     news_lines = []
@@ -153,6 +159,8 @@ def _build_classify_prompt(items: list[dict], brand_configs: list[dict],
 - correct_track：新闻属于哪个赛道（来自上方赛道列表，或"无"）
 - is_followup：是否为近期已推事件的跟进报道（true/false）
 - followup_note：如果 is_followup=true，用一句话说明是对哪个已知事件的跟进
+- signal_type：事件类型，只能是 新品/融资/品牌升级/代言人/渠道扩张/合作/其他 之一
+- opportunity_level：商机级别，只能是 high 或 normal
 
 【品牌列表】
 {chr(10).join(brand_lines) if brand_lines else "无"}
@@ -160,17 +168,29 @@ def _build_classify_prompt(items: list[dict], brand_configs: list[dict],
 【行业列表】
 {chr(10).join(industry_lines) if industry_lines else "无"}
 
+【赛道关键词参考（判断 correct_track 时使用）】
+{chr(10).join(track_hint_lines) if track_hint_lines else "无"}
+
 【近期已推事件】
 {chr(10).join(event_lines)}
 
 【新闻列表】
 {chr(10).join(news_lines)}
 
+【关键判断规则】
+判断 correct_brand 时，必须同时满足：
+1. 品牌名必须在标题的前半部分出现（前30个字符内）
+2. 品牌必须是新闻的主语（新闻是"关于"这个品牌的，而不是"提到"这个品牌的）
+3. 如果标题中出现"联合X"、"与X合作"、"携手X"、"X联名"、"据X报道"，则X不是主语，correct_brand 应为"无"或实际主语品牌
+4. 如果新闻内容主要是行业综述（"X品牌在YY领域的市场份额提升"），即使提到某品牌，该品牌也不是主语
+5. 以下信号优先判为 high：新品发布/融资到账/品牌升级/代言人官宣/渠道扩张/进入新市场
+6. 普通报道、弱相关合作、泛行业提及，判为 normal
+
 直接返回 JSON 数组，不要前缀文字，数组长度必须恰好是 {len(items)}。
 
 输出格式：
 [
-  {{"id": 0, "correct_brand": "vivo", "correct_track": "", "is_followup": false, "followup_note": ""}},
+  {{"id": 0, "correct_brand": "vivo", "correct_track": "", "is_followup": false, "followup_note": "", "signal_type": "新品", "opportunity_level": "high"}},
   ...
 ]"""
     return prompt
@@ -216,6 +236,8 @@ def _parse_classify_response(text: str, items: list[dict]) -> list[dict]:
             "track_name": info.get("correct_track", ""),
             "is_followup": info.get("is_followup", False),
             "followup_note": info.get("followup_note", ""),
+            "signal_type": info.get("signal_type", "其他") or "其他",
+            "opportunity_level": info.get("opportunity_level", "normal") or "normal",
             "title": item.get("title", ""),
             "url": item.get("url", ""),
             "content": item.get("content", ""),
@@ -240,6 +262,8 @@ def _call_classify_llm(items: list[dict], brand_configs: list[dict],
             "track_name": "",
             "is_followup": False,
             "followup_note": "",
+            "signal_type": "其他",
+            "opportunity_level": "normal",
             "title": item.get("title", ""),
             "url": item.get("url", ""),
             "content": item.get("content", ""),
@@ -256,6 +280,7 @@ def preprocess(
     industry_configs: list[dict],
     profile_fundraising_tracks: list[dict],
     recent_events: list[str] = None,
+    skip_dedup: bool = False,
 ) -> list[dict]:
     """
     Layer 2 预处理入口（deduplicate 并入内部，不对外暴露）。
@@ -279,9 +304,13 @@ def preprocess(
     """
     print(f"\n[Layer2 预处理] 输入 {len(raw_results)} 条")
 
-    # 第1步：纯规则去重（URL/标题/事件 + 噪音过滤），并入 preprocess 内部
-    deduped = _rule_dedup(raw_results)
-    print(f"  [Layer2 规则去重] {len(raw_results)} → {len(deduped)} 条")
+    # 第1步：纯规则去重（cache 模式跳过，因为数据已被推送过）
+    if skip_dedup:
+        deduped = raw_results
+        print(f"  [Layer2 跳过去重] cache 模式")
+    else:
+        deduped = _rule_dedup(raw_results)
+        print(f"  [Layer2 规则去重] {len(raw_results)} → {len(deduped)} 条")
 
     # 第2步：规则粗筛（品牌相关性，移自 main.py）
     before_rule = len(deduped)

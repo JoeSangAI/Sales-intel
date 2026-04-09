@@ -23,7 +23,7 @@ def _call_qc_llm(prompt: str, timeout: int = 120, max_tokens: int = 2000) -> str
 
 # ── 质检 Prompt ─────────────────────────────────────────────────
 
-def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
+def _build_qc_prompt(report: str, original_items: list[dict], decision_maker_urls: list[str] | None = None) -> str:
     """构建质检 prompt"""
     # 原始新闻列表（用于幻觉比对）
     item_lines = []
@@ -38,6 +38,7 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
 
     # 提取报告中所有 URL
     report_urls = re.findall(r'https?://[^\s\)\]]+', report)
+    valid_decision_maker_urls = decision_maker_urls or []
     # 提取报告中出现的公司/品牌名
     brand_names_in_report = re.findall(r'### 【(.+?)】', report)
 
@@ -51,7 +52,7 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
 - **每条事件是否都有来源链接？来源链接是否紧跟在事件描述之后？**
 
 【幻觉检查——最重要】
-1. **URL 检查**：日报中每个 [xxx](url) 的 url，必须真实存在于原始新闻列表中
+1. **URL 检查**：日报中每个 [xxx](url) 的 url，必须真实存在于原始新闻列表中，或存在于关键决策人实名搜索结果中
 2. **无链接内容检查**：报告中任何没有URL的事件描述、或放在"来源：[媒体名](链接)"之前的分析段落，都是严重幻觉
 3. **品牌存在性检查**：报告中出现的公司/品牌名（如 {"、".join(brand_names_in_report[:10])}），必须能在原始新闻列表的 brand 或 title 字段中找到真实对应
 4. **赛道合理性检查**：报告中融资条目被归入的赛道，必须与该品牌的实际业务匹配（如 OpenAI 不应出现在"日用洗护"、"消费品"等赛道）
@@ -62,6 +63,9 @@ def _build_qc_prompt(report: str, original_items: list[dict]) -> str:
 
 报告中的品牌章节（共 {len(brand_names_in_report)} 个）:
 {chr(10).join(brand_names_in_report) if brand_names_in_report else "（无品牌章节）"}
+
+【关键决策人来源链接】
+{chr(10).join(valid_decision_maker_urls[:50]) if valid_decision_maker_urls else "（无关键人链接）"}
 
 【日报内容】
 {report}
@@ -115,7 +119,8 @@ def _parse_qc_response(text: str) -> dict:
 
 # ── 公开接口 ──────────────────────────────────────────────────
 
-def quality_check(report: str, original_items: list[dict], profile: dict = None) -> dict:
+def quality_check(report: str, original_items: list[dict], profile: dict = None,
+                  decision_makers_map: dict[str, list[dict]] | None = None) -> dict:
     """
     质检：检查报告的格式正确性和幻觉问题。
 
@@ -133,6 +138,7 @@ def quality_check(report: str, original_items: list[dict], profile: dict = None)
         }
     """
     # ── 第一层：规则校验（确定性）──
+    item_issues = []
     if profile and original_items:
         rules_result = run_rules_check(report, original_items, profile)
         if not rules_result["pass"]:
@@ -147,9 +153,11 @@ def quality_check(report: str, original_items: list[dict], profile: dict = None)
                 "pass": False,
                 "rules_issues": rules_result["issues"],
                 "rules_warnings": rules_result["warnings"],
+                "item_issues": rules_result.get("item_issues", []),
             }
         if rules_result["warnings"]:
             print(f"  [QC 规则警告] {len(rules_result['warnings'])} 个（非阻断）")
+        item_issues = rules_result.get("item_issues", [])
     # ── 第二层：LLM 语义校验（继续原有逻辑）──
 
     if not report:
@@ -162,7 +170,13 @@ def quality_check(report: str, original_items: list[dict], profile: dict = None)
         }
 
     print("\n[QC 质检] 开始检查...")
-    prompt = _build_qc_prompt(report, original_items)
+    decision_maker_urls = []
+    for makers in (decision_makers_map or {}).values():
+        for maker in makers:
+            url = maker.get("source_url", "")
+            if url:
+                decision_maker_urls.append(url)
+    prompt = _build_qc_prompt(report, original_items, decision_maker_urls)
     raw = _call_qc_llm(prompt)
 
     if not raw:
@@ -182,12 +196,15 @@ def quality_check(report: str, original_items: list[dict], profile: dict = None)
         issues = result.get("hallucination_issues", [])
         print(f"  [QC 失败] 幻觉问题 {len(issues)} 个: {issues[:3]}")
 
+    # 合并 item_issues 到返回结果
+    result["item_issues"] = item_issues
     return result
 
 
 def retry_with_feedback(report: str, feedback: dict,
                         original_items: list[dict],
-                        config: dict = None) -> str:
+                        config: dict = None,
+                        decision_makers_map: dict[str, list[dict]] | None = None) -> str:
     """
     将质检反馈注入 prompt，重新生成报告。
 
@@ -205,6 +222,24 @@ def retry_with_feedback(report: str, feedback: dict,
     # 提取幻觉问题构建反馈
     hallucination_issues = feedback.get("hallucination_issues", [])
     format_issues = feedback.get("format_issues", [])
+    item_issues = feedback.get("item_issues", [])
+
+    # ── 根据 item_issues 过滤原始条目 ──
+    # item_issues 中 action=remove_or_fix/remove_or_retrack 的条目应被排除
+    bad_urls = set()
+    for issue in item_issues:
+        action = issue.get("action", "")
+        if action in ("remove_or_fix", "remove_or_retrack", "remove_or_downgrade"):
+            url = issue.get("url", "")
+            if url:
+                bad_urls.add(url)
+                print(f"  [QC 过滤] 移除问题条目 (R{issue.get('issue_type','')}): {issue.get('title', url)[:50]}")
+
+    if bad_urls:
+        filtered_items = [item for item in original_items if item.get("url", "") not in bad_urls]
+        print(f"  [QC 过滤] 条目 {len(original_items)} → {len(filtered_items)} 条")
+    else:
+        filtered_items = original_items
 
     # 构建白名单信息
     whitelist_section = ""
@@ -218,9 +253,9 @@ def retry_with_feedback(report: str, feedback: dict,
 ⚠️ 不在上述白名单中的品牌/赛道，必须从报告中完全删除，不能仅改标签。
 """
 
-    # 原始新闻列表
+    # 原始新闻列表（已过滤问题条目）
     item_lines = []
-    for i, item in enumerate(original_items):
+    for i, item in enumerate(filtered_items):
         title = item.get("title", "")
         url = item.get("url", "")
         content = item.get("content", "")[:600]
@@ -236,6 +271,9 @@ def retry_with_feedback(report: str, feedback: dict,
 
 格式问题：
 {chr(10).join(f"- {issue}" for issue in format_issues) if format_issues else "无"}
+
+条目级问题（已在原始列表中移除，请勿使用）：
+{chr(10).join(f"- [{i.get('issue_type','')}] {i.get('reason','')} (URL: {i.get('url','')})" for i in item_issues) if item_issues else "无"}
 {whitelist_section}
 【原始新闻列表（必须严格使用这些 URL）】
 {chr(10).join(item_lines) if item_lines else "（无原始新闻）"}
@@ -249,7 +287,9 @@ def retry_with_feedback(report: str, feedback: dict,
 3. 保持原有结构和有价值内容，只修复质检问题
 4. **品牌不在注册品牌白名单中的客户新闻条目，必须整条删除**
 5. **赛道不在注册赛道白名单中的融资条目，必须整条删除**
-6. 直接输出修复后的 Markdown 报告，不要有前缀文字。
+6. **禁止虚构：如果某注册品牌在原始新闻列表中无任何条目，只能标注"暂无动态"，不得捏造任何事件**
+7. **禁止补充来源：事件的细节（数字、产品名、时间）必须来自原始条目，不得自行补充**
+8. 直接输出修复后的 Markdown 报告，不要有前缀文字。
 
 直接输出 Markdown 报告。"""
 

@@ -116,6 +116,7 @@ from scripts.profile_context import set_profile, get_profile
 from scripts.dedup import deduplicate, dedup_fundraising_by_company, _normalize_title
 from scripts.layer2_preprocessor import preprocess
 from scripts.layer3_chef import chef_report
+from scripts.decision_makers import enrich_decision_makers
 from scripts.quality_check import quality_check, retry_with_feedback
 from scripts.memory import (
     record_interaction, record_feedback, content_hash_from_result,
@@ -356,13 +357,14 @@ def _run_pipeline_inner(
                        if r.get("brand", "").startswith("[融资]")]
 
     # 品牌/行业：去重并入 preprocess 内部；融资：统一在这里去重
-    if brand_industry_raw and not use_cache:
+    if brand_industry_raw:
         brand_industry_clean = preprocess(
             raw_results=brand_industry_raw,
             brand_configs=brand_configs,
             industry_configs=industry_configs,
             profile_fundraising_tracks=fundraising_config.get("tracks", []),
             recent_events=all_recent,
+            skip_dedup=use_cache,
         )
     else:
         brand_industry_clean = brand_industry_raw
@@ -394,7 +396,6 @@ def _run_pipeline_inner(
     # ── Step 2c: 融资公司名归一化去重 ──
     fundraising_items = [i for i in all_items if i.get("brand", "").startswith("[融资]")]
     if fundraising_items:
-        from scripts.dedup import dedup_fundraising_by_company
         fundraising_deduped = dedup_fundraising_by_company(fundraising_items)
         non_fundraising = [i for i in all_items if not i.get("brand", "").startswith("[融资]")]
         all_items = non_fundraising + fundraising_deduped
@@ -403,6 +404,8 @@ def _run_pipeline_inner(
             print(f"  [融资去重] 同公司合并: {len(fundraising_items)} → {len(fundraising_deduped)} 条")
 
     print(f"  Layer 2 预处理后: {len(all_items)} 条")
+
+    decision_makers_map = enrich_decision_makers(all_items, config)
 
     if not all_items:
         print("  无有效条目，跳过日报")
@@ -423,19 +426,20 @@ def _run_pipeline_inner(
         recent_events=[f"{e.get('brand', '')} - {e.get('event_key', '')}"
                        for e in recent_events_list if e.get("event_key")],
         endorsement_items=endorsement_items or [],
+        decision_makers_map=decision_makers_map,
     )
     print(f"  报告生成完成，共 {len(report)} 字符")
 
     # ── Step 3b: 质检 ─────────────────────────────────────
     if report and not dry_run:
         print("\n[Step 3b] 质检...")
-        qc_result = quality_check(report, all_items)
+        qc_result = quality_check(report, all_items, profile=config, decision_makers_map=decision_makers_map)
 
         if not qc_result["pass"]:
             print(f"  [质检首次] 发现问题: {qc_result.get('hallucination_issues', qc_result.get('format_issues', []))}")
             # 首次失败：注入反馈，重新生成
-            report = retry_with_feedback(report, qc_result, all_items, config=config)
-            qc_result2 = quality_check(report, all_items)
+            report = retry_with_feedback(report, qc_result, all_items, config=config, decision_makers_map=decision_makers_map)
+            qc_result2 = quality_check(report, all_items, profile=config, decision_makers_map=decision_makers_map)
             if not qc_result2["pass"]:
                 print(f"  [质检重试后] 仍有问题，标记人工审核")
                 report = "⚠️ 需要人工审核\n\n" + report

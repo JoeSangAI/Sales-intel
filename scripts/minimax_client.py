@@ -1,12 +1,45 @@
 """
 统一 MiniMax API 客户端，所有 LLM 调用都经过这里。
-包含指数退避重试，专门处理 5xx（特别是 529）错误。
+使用 Session 连接池 + urllib3 传输层重试，大幅降低 SSL 断连概率。
 """
 
 import os
 import time
-import requests
 import re
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+
+# ── 全局 Session（连接复用，避免反复 SSL 握手）──────────────────
+
+_session: requests.Session | None = None
+
+
+def _get_session() -> requests.Session:
+    """懒初始化全局 Session，带传输层自动重试"""
+    global _session
+    if _session is not None:
+        return _session
+
+    _session = requests.Session()
+
+    # urllib3 传输层重试：专治 SSL EOF / ConnectionReset / 连接中断
+    transport_retry = Retry(
+        total=3,
+        backoff_factor=2,            # 重试间隔: 0s, 2s, 4s
+        status_forcelist=[502, 503, 529],
+        allowed_methods=["POST"],
+        raise_on_status=False,       # 不抛异常，交给上层处理
+    )
+    adapter = HTTPAdapter(
+        max_retries=transport_retry,
+        pool_connections=4,
+        pool_maxsize=4,
+    )
+    _session.mount("https://", adapter)
+    _session.mount("http://", adapter)
+    return _session
 
 
 def call_minimax(
@@ -19,14 +52,16 @@ def call_minimax(
     """
     调用 MiniMax M2.7，返回原始文本内容。
 
-    重试策略：指数退避（5s → 15s → 45s），专门针对 5xx 错误加长等待。
-    529 (Server Overloaded) 需要更长恢复时间。
+    连接策略：
+    - 使用全局 Session 复用 TCP + SSL 连接（避免反复握手）
+    - urllib3 底层自动处理 SSL EOF / 502 / 503 / 529
+    - 上层再做业务级指数退避重试（5xx / 超时 / 连接断开）
 
     Args:
         prompt: 输入 prompt
-        timeout: 请求超时（秒）
+        timeout: 读取超时（秒），连接超时固定 15s
         max_tokens: 最大返回 token 数
-        retries: 最大重试次数
+        retries: 最大业务级重试次数
         model: 模型名称
 
     Returns:
@@ -37,12 +72,12 @@ def call_minimax(
         print("  [MiniMax 警告] MINIMAX_API_KEY 未设置")
         return ""
 
-    # 指数退避序列：5s, 15s, 45s（对 529 需要足够长）
+    session = _get_session()
     backoff = [5, 15, 45]
 
     for attempt in range(retries + 1):
         try:
-            resp = requests.post(
+            resp = session.post(
                 "https://api.minimax.chat/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {minimax_key}",
@@ -54,21 +89,18 @@ def call_minimax(
                     "temperature": 0.3,
                     "messages": [{"role": "user", "content": prompt}],
                 },
-                timeout=timeout,
+                timeout=(15, timeout),  # (连接超时, 读取超时)
             )
 
-            # 5xx 错误需要特殊处理
             if resp.status_code >= 500:
-                server_error_msg = f"服务器错误 {resp.status_code}"
+                msg = f"服务器错误 {resp.status_code}"
                 if attempt < retries:
-                    wait = backoff[attempt] if attempt < len(backoff) else backoff[-1]
-                    print(f"  [MiniMax {server_error_msg} {'(重试)' if attempt < retries else ''}] "
-                          f"等待 {wait}s 后重试 ({attempt + 1}/{retries})", flush=True)
+                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    print(f"  [MiniMax {msg} (重试)] 等待 {wait}s ({attempt + 1}/{retries})", flush=True)
                     time.sleep(wait)
                     continue
-                else:
-                    print(f"  [MiniMax {server_error_msg}] 重试耗尽，返回空", flush=True)
-                    return ""
+                print(f"  [MiniMax {msg}] 重试耗尽，返回空", flush=True)
+                return ""
 
             resp.raise_for_status()
             choices = resp.json().get("choices", [])
@@ -77,13 +109,12 @@ def call_minimax(
             else:
                 content = ""
 
-            # 去掉 MiniMax 思考块
             content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
             return content
 
         except requests.exceptions.Timeout:
             if attempt < retries:
-                wait = backoff[attempt] if attempt < len(backoff) else backoff[-1]
+                wait = backoff[min(attempt, len(backoff) - 1)]
                 print(f"  [MiniMax 超时 (重试)] 等待 {wait}s ({attempt + 1}/{retries})", flush=True)
                 time.sleep(wait)
                 continue
@@ -91,10 +122,14 @@ def call_minimax(
             return ""
 
         except requests.exceptions.ConnectionError as e:
+            # SSL EOF 会走这里；先关闭旧连接再重试
+            session.close()
+            _reset_session()
             if attempt < retries:
-                wait = backoff[attempt] if attempt < len(backoff) else backoff[-1]
+                wait = backoff[min(attempt, len(backoff) - 1)]
                 print(f"  [MiniMax 连接断开 (重试)] 等待 {wait}s ({attempt + 1}/{retries})", flush=True)
                 time.sleep(wait)
+                session = _get_session()
                 continue
             print(f"  [MiniMax 连接断开] 重试耗尽，返回空: {e}", flush=True)
             return ""
@@ -104,3 +139,9 @@ def call_minimax(
             return ""
 
     return ""
+
+
+def _reset_session():
+    """SSL 断连后重建 Session，强制新建连接"""
+    global _session
+    _session = None

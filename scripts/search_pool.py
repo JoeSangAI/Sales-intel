@@ -18,6 +18,82 @@ from scripts.search import (
 
 _SHARED_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "shared")
 
+# 赛道-业务关键词映射（与 dedup.py 保持一致）
+_TRACK_BUSINESS_KW = {
+    "AI大模型": ["大模型", "LLM", "人工智能", "AI公司", "AI创业", "AI独角兽", "生成式AI", "AGI", "AIGC", "ChatGPT", "GPT", "文心", "通义", "豆包", "DeepSeek", "Kimi", "月之暗面", "智谱", "百川", "零一万物", "阶跃", "元象", "深度求索", "OpenAI", "Anthropic", "Mistral", "AI助手", "千寻"],
+    "机器人/具身智能": ["机器人", "具身智能", "人形机器人", "机械臂", "自动驾驶", "AGV", "ROS", "Robotics", "Embodied", "灵巧手", "四足机器人", "机械狗", "千寻智能", "宇树", "追觅", "傅利叶", "智元", "星动纪元", "具身", "机器人关节", "智能搬运"],
+    "新能源汽车/智能汽车": ["新能源汽车", "电动车", "锂电池", "动力电池", "充电桩", "电驱", "智驾", "辅助驾驶", "宁德时代", "比亚迪", "蔚来", "小鹏", "理想", "广汽埃安", "华为智驾", "鸿蒙智行", "问界", "智界", "享界", "尊界", "尚界", "启境", "华境", "奕境", "纯电动", "增程式", "混动"],
+    "智能硬件/IoT": ["智能硬件", "IoT", "物联网", "智能家居", "可穿戴", "智能音箱", "智能手表", "AR", "VR", "MR", "元宇宙硬件", "智能门锁", "扫地机器人", "智能眼镜"],
+    "企业服务/SaaS": ["SaaS", "企业服务", "云服务", "CRM", "ERP", "OA", "HR SaaS", "财税", "数据分析", "BI", "低代码", "B2B", "企业软件"],
+    "半导体": ["半导体", "芯片", "晶圆", "光刻", "封装测试", "IC设计", "处理器", "GPU", "CPU", "ASIC", "AI芯片", "集成电路"],
+    "保健品": ["保健", "营养品", "维生素", "鱼油", "膳食补充", "功能性食品", "益生菌", "氨糖", "钙片", "燕窝", "阿胶"],
+    "户外服装": ["户外", "登山", "露营", "徒步", "运动装备", "冲锋衣", "帐篷", "探路者", "北面", "始祖鸟", "迪卡侬", "凯乐石", "防晒衣", "登山鞋"],
+    "教育": ["教育", "培训", "学习", "课程", "学校", "K12", "职业教育", "留学", "家教", "课外辅导", "早教", "少儿英语"],
+    "医疗健康": ["医疗", "医院", "制药", "生物医药", "医疗器械", "体检", "齿科", "眼科", "中医", "医保"],
+}
+
+_AI_COMPANY_KW = ["AI", "人工智能", "大模型", "智能科技", "DeepSeek", "OpenAI", "Kimi", "文心", "通义", "豆包", "智谱", "百川", "阶跃", "元象", "深度求索", "月之暗面", "零一", "千寻", "万物代码"]
+
+
+def _is_likely_ai_company(company_name: str) -> bool:
+    name_lower = company_name.lower()
+    return any(kw.lower() in name_lower for kw in _AI_COMPANY_KW)
+
+
+def _score_track_alignment(company_name: str, track_name: str, content: str) -> float:
+    """计算公司+内容与赛道的匹配度"""
+    if not track_name or track_name not in _TRACK_BUSINESS_KW:
+        return 0.5
+    text = f"{company_name} {content[:500]}".lower()
+    keywords = _TRACK_BUSINESS_KW.get(track_name, [])
+    score = 0.0
+    for kw in keywords:
+        if kw.lower() in company_name.lower():
+            score += 0.4
+    matches = sum(1 for kw in keywords if kw.lower() in text)
+    if matches > 0:
+        score += min(0.6, matches * 0.15)
+    return min(1.0, score)
+
+
+def _reassign_track(item: dict) -> dict:
+    """
+    检查融资条目的赛道是否与公司业务匹配。
+    无论公司类型如何，只要当前赛道匹配度低，就修正为内容最匹配的赛道。
+    """
+    brand = item.get("brand", "")
+    if not brand.startswith("[融资]"):
+        return item
+
+    company_name = brand[len("[融资]"):].strip()
+    current_track = item.get("track_name", "")
+    content = item.get("content", "")[:500]
+
+    # 计算当前赛道的匹配度
+    current_score = _score_track_alignment(company_name, current_track, content)
+
+    # 如果当前赛道匹配度已经不错（>= 0.5），不修正
+    if current_score >= 0.5:
+        return item
+
+    # 寻找最佳匹配赛道
+    best_track = None
+    best_score = 0.0
+    for t, kws in _TRACK_BUSINESS_KW.items():
+        score = _score_track_alignment(company_name, t, content)
+        if score > best_score:
+            best_score = score
+            best_track = t
+
+    # 只有当找到的赛道明显更好时才修正（差距至少 0.1，且最佳赛道匹配度 > 0）
+    if best_track and best_score > 0 and (best_score - current_score) >= 0.1:
+        print(f"  [赛道修正 search_pool] '{company_name}': {current_track}({current_score:.2f}) → {best_track}({best_score:.2f})")
+        item = dict(item)
+        item["track_name"] = best_track
+        item["_track_reassigned"] = True
+
+    return item
+
 
 def _ensure_shared_dir():
     os.makedirs(_SHARED_DIR, exist_ok=True)
@@ -225,19 +301,13 @@ def distribute_results(pool: dict, profile: dict) -> list[dict]:
 
             # 融资结果：严格按赛道过滤（没有配置赛道则不分发融资结果）
             if brand.startswith("[融资]"):
+                # 先尝试修正赛道（AI公司被错误归类时）
+                item = _reassign_track(item)
+                track = item.get("track_name", "")  # 用修正后的track
+
                 if profile_tracks and track:
-                    # 精确匹配
+                    # 修正后的赛道精确匹配
                     if track in profile_tracks:
-                        # AI 公司不能出现在非 AI 赛道（防止跨行业污染）
-                        title = item.get("title", "")
-                        ai_keywords = ["openai", "深度求索", "deepseek", "通义千问",
-                                        "豆包", "文心", "kimi", "月之暗面", "智谱",
-                                        "百川", "零一万物", "阶跃星辰", "元象"]
-                        is_ai_company = any(kw in title.lower() for kw in ai_keywords)
-                        non_ai_tracks = ["日用洗护", "消费品", "休闲食品", "儿童服饰",
-                                         "家居用品", "服装", "美妆", "护肤"]
-                        if is_ai_company and track in non_ai_tracks:
-                            continue  # AI 公司被错误标到非 AI 赛道，跳过
                         results.append(item)
                 continue
 
