@@ -3,6 +3,7 @@
 使用 Session 连接池 + urllib3 传输层重试，大幅降低 SSL 断连概率。
 """
 
+import json
 import os
 import time
 import re
@@ -42,12 +43,107 @@ def _get_session() -> requests.Session:
     return _session
 
 
+def extract_json(text: str) -> str | None:
+    """
+    从 MiniMax 返回文本中健壮提取 JSON。
+    处理：markdown 代码块包裹、前缀非 JSON 文本。
+    核心策略：找到所有完整 JSON 对象/数组，返回最后一个（最长）。
+    """
+    if not text:
+        return None
+    text = text.strip()
+    # 去掉 markdown 代码块
+    text = re.sub(r'^```(?:json)?[^\n]*\n?', '', text)
+    text = re.sub(r'\n?```$', '', text)
+    text = text.strip()
+    if not text:
+        return None
+    # 尝试直接解析
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError:
+        pass
+
+    # 策略：找到所有完整 JSON 对象/数组，返回最后一个（最长的）
+    # 用栈来匹配括号，遇到 complete 的就记录
+    results = []
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if ch in ' \t\n\r':
+            i += 1
+            continue
+        if ch == '[':
+            # 尝试从 [ 开始解析
+            end = _find_json_end(text, i, '[', ']')
+            if end is not None:
+                candidate = text[i:end+1]
+                try:
+                    json.loads(candidate)
+                    results.append(candidate)
+                    i = end + 1
+                    continue
+                except json.JSONDecodeError:
+                    pass
+        elif ch == '{':
+            end = _find_json_end(text, i, '{', '}')
+            if end is not None:
+                candidate = text[i:end+1]
+                try:
+                    json.loads(candidate)
+                    results.append(candidate)
+                    i = end + 1
+                    continue
+                except json.JSONDecodeError:
+                    pass
+        i += 1
+
+    return results[-1] if results else None
+
+
+def _find_json_end(text: str, start: int, open_char: str, close_char: str) -> int | None:
+    """从 open_char 位置开始，找到匹配的 close_char 位置（支持嵌套和字符串）。"""
+    depth = 1
+    in_str = False
+    escape = False
+    i = start + 1
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if escape:
+            escape = False
+            i += 1
+            continue
+        if ch == '\\':
+            escape = True
+            i += 1
+            continue
+        if ch == '"':
+            in_str = not in_str
+            i += 1
+            continue
+        if in_str:
+            i += 1
+            continue
+        if ch == open_char:
+            depth += 1
+        elif ch == close_char:
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
 def call_minimax(
     prompt: str,
     timeout: int = 120,
     max_tokens: int = 4000,
     retries: int = 3,
     model: str = "MiniMax-M2.7",
+    json_mode: bool = False,
 ) -> str:
     """
     调用 MiniMax M2.7，返回原始文本内容。
@@ -63,6 +159,7 @@ def call_minimax(
         max_tokens: 最大返回 token 数
         retries: 最大业务级重试次数
         model: 模型名称
+        json_mode: 是否强制 JSON 输出（使用 response_format）
 
     Returns:
         str: LLM 返回的文本内容，失败返回空字符串
@@ -75,6 +172,15 @@ def call_minimax(
     session = _get_session()
     backoff = [5, 15, 45]
 
+    body = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+
     for attempt in range(retries + 1):
         try:
             resp = session.post(
@@ -83,14 +189,25 @@ def call_minimax(
                     "Authorization": f"Bearer {minimax_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "model": model,
-                    "max_tokens": max_tokens,
-                    "temperature": 0.3,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
+                json=body,
                 timeout=(15, timeout),  # (连接超时, 读取超时)
             )
+
+            if resp.status_code == 400 and json_mode:
+                # JSON mode 下的 400 说明模型没有严格返回 JSON
+                body_copy = body.copy()
+                del body_copy["response_format"]
+                resp_text = resp.text[:500]
+                print(f"  [MiniMax JSON_MODE 400] 退回非 JSON 模式: {resp_text}", flush=True)
+                resp = session.post(
+                    "https://api.minimax.chat/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {minimax_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=body_copy,
+                    timeout=(15, timeout),
+                )
 
             if resp.status_code >= 500:
                 msg = f"服务器错误 {resp.status_code}"

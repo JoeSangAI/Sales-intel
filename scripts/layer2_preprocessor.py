@@ -12,7 +12,7 @@ PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, PROJECT_ROOT)
 
 from scripts.dedup import deduplicate, _normalize_url, _normalize_title
-from scripts.minimax_client import call_minimax
+from scripts.minimax_client import call_minimax, extract_json
 
 
 # ── 噪音域名过滤 ────────────────────────────────────────────────
@@ -117,8 +117,8 @@ def _separate_by_type(results: list[dict]) -> tuple[list[dict], list[dict]]:
 # ── MiniMax API 调用 ────────────────────────────────────────────
 
 def _call_minimax_raw(prompt: str, timeout: int = 120, max_tokens: int = 4000, retries: int = 3) -> str:
-    """调用 MiniMax M2.7，返回原始文本内容"""
-    return call_minimax(prompt, timeout=timeout, max_tokens=max_tokens, retries=retries)
+    """调用 MiniMax M2.7，返回原始文本内容（JSON 模式）"""
+    return call_minimax(prompt, timeout=timeout, max_tokens=max_tokens, retries=retries, json_mode=True)
 
 
 # ── Prompt 构建与解析 ──────────────────────────────────────────
@@ -207,14 +207,18 @@ def _parse_classify_response(text: str, items: list[dict]) -> list[dict]:
     # 去掉 MiniMax 思考块
     text = re.sub(r'<think>[\s\S]*?</think>', '', text)
 
+    # 去掉 markdown 代码块（与 extract_json 保持一致，但这里先处理再调用）
+    text_stripped = re.sub(r'^```(?:json)?[^\n]*\n?', '', text.strip())
+    text_stripped = re.sub(r'\n?```$', '', text_stripped).strip()
+
     try:
-        parsed = json.loads(text)
+        parsed = json.loads(text_stripped)
     except json.JSONDecodeError:
-        # 尝试找 JSON 数组
-        match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
-        if match:
+        # 用健壮的 extract_json 提取（支持截断文本）
+        extracted = extract_json(text)
+        if extracted:
             try:
-                parsed = json.loads(match.group(0))
+                parsed = json.loads(extracted)
             except json.JSONDecodeError:
                 print(f"  [Layer2 解析失败] LLM 返回非 JSON，fallback 到原始值")
                 parsed = []

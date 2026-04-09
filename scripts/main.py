@@ -48,20 +48,24 @@ def md_to_pdf(md_path: str) -> str:
     import markdown2
 
     css = (
-        'body { font-family: "PingFang SC","Heiti SC",sans-serif; font-size: 13px; '
-        'line-height: 1.8; padding: 30px 40px; color: #333; max-width: 800px; margin: 0 auto; }'
-        'h1 { font-size: 20px; border-bottom: 2px solid #2563eb; padding-bottom: 8px; color: #1e3a5f; }'
-        'h2 { font-size: 17px; color: #1e40af; margin-top: 28px; }'
-        'h3 { font-size: 15px; color: #374151; margin-top: 20px; }'
-        'h4 { font-size: 14px; color: #4b5563; }'
+        'body { font-family: "PingFang SC","Heiti SC","Microsoft YaHei","Apple Color Emoji","Segoe UI Emoji",sans-serif; font-size: 13px; '
+        'line-height: 1.8; padding: 30px 40px; color: #333; max-width: 800px; margin: 0 auto; '
+        'word-break: break-all; overflow-wrap: break-word; }'
+        'h1 { font-size: 22px; font-weight: 700; border-bottom: 3px solid #1e40af; padding-bottom: 10px; color: #1e3a5f; margin-bottom: 6px; }'
+        'h2 { font-size: 16px; font-weight: 700; color: #fff; background: #1e40af; padding: 8px 14px; border-radius: 4px; margin-top: 32px; margin-bottom: 12px; }'
+        'h3 { font-size: 14px; font-weight: 700; color: #1e3a5f; border-left: 4px solid #2563eb; padding-left: 10px; margin-top: 20px; margin-bottom: 6px; }'
+        'h4 { font-size: 13px; color: #4b5563; }'
+        'strong { font-weight: 700; color: #1e3a5f; }'
         'a { color: #2563eb; text-decoration: none; }'
         'table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12px; }'
         'th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }'
         'th { background: #f3f4f6; font-weight: 600; }'
         'blockquote { border-left: 3px solid #2563eb; padding-left: 12px; color: #555; '
         'margin: 12px 0; background: #f8fafc; padding: 8px 12px; }'
-        'ul { padding-left: 20px; } li { margin-bottom: 8px; }'
-        'hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }'
+        'ul { display: block; padding-left: 24px; margin: 8px 0; list-style: disc; }'
+        'li { display: block; margin-bottom: 10px; word-break: break-all; overflow-wrap: break-word; }'
+        'p { margin: 6px 0; }'
+        'hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }'
     )
 
     chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
